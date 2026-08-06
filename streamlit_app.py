@@ -1,11 +1,17 @@
 import streamlit as st
 from openai import OpenAI
 
-st.set_page_config(page_title="Yosef AI", page_icon="🤖")
+st.set_page_config(
+    page_title="Yosef AI",
+    page_icon="🤖"
+)
 
 st.title("🤖 Yosef AI")
 
-api_key = st.text_input("OpenRouter API Key", type="password")
+api_key = st.text_input(
+    "OpenRouter API Key",
+    type="password"
+)
 
 if api_key:
 
@@ -26,7 +32,10 @@ if api_key:
     if prompt:
 
         st.session_state.messages.append(
-            {"role": "user", "content": prompt}
+            {
+                "role": "user",
+                "content": prompt
+            }
         )
 
         with st.chat_message("user"):
@@ -35,7 +44,7 @@ if api_key:
         try:
 
             response = client.chat.completions.create(
-                model="meta-llama/llama-3.1-8b-instruct:free",
+                model="openai/gpt-oss-20b:free",
                 messages=st.session_state.messages
             )
 
@@ -52,7 +61,7 @@ if api_key:
                 st.markdown(answer)
 
         except Exception as e:
-            st.error(str(e))
+            st.error(f"حدث خطأ: {e}")
 
 else:
-    st.info("أدخل مفتاح OpenRouter API")
+    st.info("🔑 أدخل مفتاح OpenRouter API")

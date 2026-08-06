@@ -39,8 +39,8 @@ if api_key:
         with st.chat_message("user"):
             st.markdown(prompt)
 
-        try:
-                        response = client.models.generate_content(
+               try:
+            response = client.models.generate_content(
                 model="gemini-2.5-flash",
                 contents=prompt
             )
@@ -61,4 +61,4 @@ if api_key:
             st.error(f"حدث خطأ: {e}")
 
 else:
-    st.info("🔑 أدخل مفتاح Gemini API للبدء.")
+    st.info("🔑 أدخل مفتاح Gemini API للبدء.")     

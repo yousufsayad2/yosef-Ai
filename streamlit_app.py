@@ -39,7 +39,8 @@ if api_key:
         with st.chat_message("user"):
             st.markdown(prompt)
 
-        try:            response = client.models.generate_content(
+        try:
+                        response = client.models.generate_content(
                 model="gemini-2.5-flash",
                 contents=prompt
             )

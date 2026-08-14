@@ -46,18 +46,7 @@ if prompt:
     prompt_text = prompt.text
                   
       
-            content.append({
-                "type": "image_url",
-                "image_url": {
-                    "url": f"data:{image_file.type};base64,{image_base64}"
-                }
-            })
-
-                {"role": "system", "content": system_prompt},
-                *st.session_state.messages[:-1],
-                {"role": "user", "content": content}
-            ]
-
+            
             response = client.chat.completions.create(
                 model="openrouter/free",
                 messages=api_messages

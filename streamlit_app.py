@@ -9,7 +9,7 @@ st.set_page_config(
 st.title("🤖 Yosef AI")
 
 api_key = st.secrets["OPENROUTER_API_KEY"]
-st.write("Secret loaded:", bool(api_key))
+
 if api_key:
 
     client = OpenAI(

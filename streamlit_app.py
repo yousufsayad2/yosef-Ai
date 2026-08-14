@@ -53,7 +53,7 @@ if prompt:
     with st.chat_message("user"):
         st.markdown(prompt)
         try: 
-        content = [{"type": "text", "text": prompt}]
+           content = [{"type": "text", "text": prompt}]
         image_file = None
 
         if uploaded_file and uploaded_file.type.startswith("image/"):

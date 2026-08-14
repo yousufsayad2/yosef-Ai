@@ -53,7 +53,7 @@ if prompt:
     with st.chat_message("user"):
         st.markdown(prompt)
 
-                try:
+              :try
                 content = [{"type": "text", "text": prompt}]
 
         image_file = None

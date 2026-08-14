@@ -45,8 +45,7 @@ if prompt:
 
     prompt_text = prompt.text
                   
-                     if uploaded_file and uploaded_file.type.startswith("image"):
-            image_bytes = image_file.getvalue()
+      if uploaded_file and uploaded_file.type.startswith("image"):               
             image_base64 = base64.b64encode(image_bytes).decode("utf-8")
 
             content.append({

@@ -22,6 +22,39 @@ st.set_page_config(
 
 
 # =========================================================
+# CSS
+# =========================================================
+
+st.markdown(
+    """
+    <style>
+
+    /* زر المكالمة */
+    .voice-call-box {
+        text-align: right;
+        margin-bottom: 8px;
+    }
+
+    /* شكل العنوان */
+    .yosef-title {
+        text-align: center;
+        font-size: 32px;
+        font-weight: bold;
+    }
+
+    .yosef-subtitle {
+        text-align: center;
+        color: #777;
+        margin-bottom: 20px;
+    }
+
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+
+# =========================================================
 # OpenRouter
 # =========================================================
 
@@ -64,6 +97,7 @@ system_prompt = """
 - استخدم المعلومات المتاحة.
 - لا تخترع معلومات.
 - إذا كانت المعلومات غير كافية، وضح ذلك.
+- لا تذكر للمستخدم تفاصيل البحث الداخلية إلا إذا طلبها.
 """
 
 
@@ -71,89 +105,13 @@ system_prompt = """
 # العنوان
 # =========================================================
 
-st.title("🤖 Yosef AI")
-
-st.write("أهلاً بيك 👋")
-
-st.write(
-    "أنا Yosef AI، مساعدك الذكي. اسألني أي حاجة!"
+st.markdown(
+    '<div class="yosef-title">🤖 Yosef AI</div>',
+    unsafe_allow_html=True
 )
 
-
-# =========================================================
-# CSS
-# =========================================================
-
 st.markdown(
-    """
-    <style>
-
-    /* =========================================
-       زر المكالمة بجانب خانة الكتابة
-       ========================================= */
-
-    .voice-call-floating {
-        position: fixed;
-        bottom: 82px;
-        left: 72px;
-        z-index: 999999;
-    }
-
-
-    .voice-call-floating button {
-        width: 44px !important;
-        height: 44px !important;
-
-        min-width: 44px !important;
-        min-height: 44px !important;
-
-        padding: 0 !important;
-
-        border-radius: 50% !important;
-
-        font-size: 20px !important;
-
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-    }
-
-
-    /* =========================================
-       الموبايل
-       ========================================= */
-
-    @media (max-width: 768px) {
-
-        .voice-call-floating {
-            bottom: 84px;
-            left: 70px;
-        }
-
-        .voice-call-floating button {
-            width: 42px !important;
-            height: 42px !important;
-
-            min-width: 42px !important;
-            min-height: 42px !important;
-
-            font-size: 19px !important;
-        }
-
-    }
-
-
-    /* =========================================
-       إخفاء المسافة الزائدة
-       ========================================= */
-
-    .voice-call-floating > div {
-        margin: 0 !important;
-        padding: 0 !important;
-    }
-
-    </style>
-    """,
+    '<div class="yosef-subtitle">أهلاً بيك 👋<br>أنا Yosef AI، مساعدك الذكي. اسألني أي حاجة!</div>',
     unsafe_allow_html=True
 )
 
@@ -168,9 +126,7 @@ if st.button(
 ):
 
     st.session_state.messages = []
-
     st.session_state.voice_call = False
-
     st.session_state.audio_frames = []
 
     st.rerun()
@@ -194,7 +150,6 @@ for message in st.session_state.messages:
 def needs_web_search(text):
 
     keywords = [
-
         "الطقس",
         "الجو",
         "درجة الحرارة",
@@ -243,10 +198,10 @@ def needs_web_search(text):
         "match"
     ]
 
-    text = text.lower()
+    text_lower = text.lower()
 
     return any(
-        keyword in text
+        keyword in text_lower
         for keyword in keywords
     )
 
@@ -260,65 +215,44 @@ def search_web(query):
     try:
 
         response = requests.get(
-
             "https://html.duckduckgo.com/html/",
-
             params={
                 "q": query
             },
-
             headers={
                 "User-Agent": "Mozilla/5.0"
             },
-
             timeout=15
         )
 
-
         if response.status_code != 200:
-
             return []
 
-
         pattern = re.compile(
-
-            r'class="result__a"'
-            r'[^>]*href="([^"]+)"'
-            r'[^>]*>(.*?)</a>',
-
+            r'class="result__a"[^>]*href="([^"]+)"[^>]*>(.*?)</a>',
             re.IGNORECASE | re.DOTALL
-
         )
-
 
         matches = pattern.findall(
             response.text
         )
 
-
         results = []
-
 
         for href, title in matches[:5]:
 
-            title = re.sub(
+            clean_title = re.sub(
                 r"<.*?>",
                 "",
                 title
             ).strip()
 
-
             results.append({
-
-                "title": title,
-
+                "title": clean_title,
                 "href": href
-
             })
 
-
         return results
-
 
     except Exception:
 
@@ -332,392 +266,28 @@ def search_web(query):
 def ask_yosef(text):
 
     content = [
-
         {
             "type": "text",
             "text": text
         }
-
     ]
 
-
-    # =========================================
+    # -----------------------------------------
     # البحث تلقائيًا ومخفيًا
-    # =========================================
+    # -----------------------------------------
 
     if needs_web_search(text):
 
         results = search_web(text)
 
-
         if results:
 
             search_text = (
-
                 "\n\n"
                 "معلومات حديثة من البحث على الإنترنت:\n\n"
-
             )
-
 
             for result in results:
 
                 search_text += (
-
-                    f"{result['title']}\n"
-                    f"{result['href']}\n\n"
-
-                )
-
-
-            content.append({
-
-                "type": "text",
-
-                "text": search_text
-
-            })
-
-
-    # =========================================
-    # تاريخ المحادثة
-    # =========================================
-
-    api_messages = [
-
-        {
-            "role": "system",
-            "content": system_prompt
-        }
-
-    ]
-
-
-    for message in st.session_state.messages:
-
-        api_messages.append({
-
-            "role": message["role"],
-
-            "content": message["content"]
-
-        })
-
-
-    api_messages.append({
-
-        "role": "user",
-
-        "content": content
-
-    })
-
-
-    # =========================================
-    # OpenRouter
-    # =========================================
-
-    response = client.chat.completions.create(
-
-        model="openrouter/free",
-
-        messages=api_messages,
-
-        max_tokens=800
-
-    )
-
-
-    answer = (
-
-        response.choices[0]
-        .message.content
-
-        or "لم أتمكن من إنشاء رد."
-
-    )
-
-
-    return answer
-
-
-# =========================================================
-# تشغيل الرد الصوتي
-# =========================================================
-
-def speak_text(text):
-
-    safe_text = (
-
-        text
-        .replace("\\", "\\\\")
-        .replace("`", "\\`")
-        .replace("${", "\\${")
-        .replace("\n", " ")
-
-    )
-
-
-    html = """
-
-    <script>
-
-        const text = `__TEXT__`;
-
-        if ("speechSynthesis" in window) {
-
-            window.speechSynthesis.cancel();
-
-            const speech =
-                new SpeechSynthesisUtterance(text);
-
-            speech.lang = "ar-SA";
-
-            speech.rate = 1.0;
-
-            speech.pitch = 1.0;
-
-            window.speechSynthesis.speak(
-                speech
-            );
-
-        }
-
-    </script>
-
-    """
-
-
-    html = html.replace(
-        "__TEXT__",
-        safe_text
-    )
-
-
-    st.components.v1.html(
-        html,
-        height=1
-    )
-
-
-# =========================================================
-# زر المكالمة
-# يظهر بجانب + أسفل الشاشة
-# =========================================================
-
-if not st.session_state.voice_call:
-
-    st.markdown(
-        '<div class="voice-call-floating">',
-        unsafe_allow_html=True
-    )
-
-
-    if st.button(
-        "📞",
-        key="floating_voice_call"
-    ):
-
-        st.session_state.voice_call = True
-
-        st.session_state.audio_frames = []
-
-        st.rerun()
-
-
-    st.markdown(
-        "</div>",
-        unsafe_allow_html=True
-    )
-
-
-# =========================================================
-# وضع المحادثة الصوتية
-# =========================================================
-
-if st.session_state.voice_call:
-
-    st.markdown("---")
-
-
-    st.markdown(
-        "## 📞 محادثة Yosef AI"
-    )
-
-
-    st.success(
-        "🟢 المحادثة الصوتية مفعّلة"
-    )
-
-
-    st.caption(
-        "اسمح للمتصفح باستخدام الميكروفون، ثم اتكلم."
-    )
-
-
-    # =========================================
-    # WebRTC
-    # =========================================
-
-    ctx = webrtc_streamer(
-
-        key="yosef_voice_call",
-
-        mode=WebRtcMode.SENDONLY,
-
-        media_stream_constraints={
-            "audio": True,
-            "video": False
-        },
-
-        audio_receiver_size=256
-
-    )
-
-
-    # =========================================
-    # استقبال الصوت
-    # =========================================
-
-    if ctx.state.playing:
-
-        try:
-
-            frames = ctx.audio_receiver.get_frames(
-                timeout=1
-            )
-
-
-            for frame in frames:
-
-                st.session_state.audio_frames.append(
-                    frame
-                )
-
-
-        except Exception:
-
-            pass
-
-
-    # =========================================
-    # إرسال الكلام إلى Yosef
-    # =========================================
-
-    if st.button(
-        "🎙️ إرسال الكلام",
-        use_container_width=True
-    ):
-
-        frames = st.session_state.audio_frames
-
-
-        if not frames:
-
-            st.warning(
-                "اتكلم في الميكروفون الأول."
-            )
-
-
-        else:
-
-            try:
-
-                pcm_data = b""
-
-                sample_rate = 48000
-
-
-                # -----------------------------
-                # تجميع الصوت
-                # -----------------------------
-
-                for frame in frames:
-
-                    audio = frame.to_ndarray()
-
-
-                    if len(audio.shape) > 1:
-
-                        audio = audio[0]
-
-
-                    pcm_data += audio.tobytes()
-
-
-                    sample_rate = frame.sample_rate
-
-
-                # -----------------------------
-                # إنشاء WAV
-                # -----------------------------
-
-                wav_buffer = io.BytesIO()
-
-
-                with wave.open(
-                    wav_buffer,
-                    "wb"
-                ) as wav_file:
-
-                    wav_file.setnchannels(1)
-
-                    wav_file.setsampwidth(2)
-
-                    wav_file.setframerate(
-                        sample_rate
-                    )
-
-                    wav_file.writeframes(
-                        pcm_data
-                    )
-
-
-                wav_buffer.seek(0)
-
-
-                # -----------------------------
-                # تحويل الصوت إلى نص
-                # -----------------------------
-
-                recognizer = sr.Recognizer()
-
-
-                with sr.AudioFile(
-                    wav_buffer
-                ) as source:
-
-                    audio_data = recognizer.record(
-                        source
-                    )
-
-
-                with st.spinner(
-                    "🎧 Yosef AI بيسمعك..."
-                ):
-
-                    spoken_text = (
-                        recognizer.recognize_google(
-                            audio_data,
-                            language="ar-EG"
-                        )
-                    )
-
-
-                st.session_state.audio_frames = []
-
-
-                # -----------------------------
-                # عرض كلام المستخدم
-                # -----------------------------
-
-                with st.chat_message("user"):
-
-                    st.markdown(
-                        spoken_text
-                    )
-
-
-                # -----------------------------
-                # Yosef AI
-                #
+                    f"{

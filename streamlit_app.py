@@ -872,22 +872,3 @@ if prompt:
                 speech_response.raise_for_status()
 
                 st.audio(
-                    speech_response.content,
-                    format="audio/mpeg"
-                )
-
-        # حفظ المحادثة
-        st.session_state.messages.append({
-            "role": "user",
-            "content": prompt_text
-        })
-
-        st.session_state.messages.append({
-            "role": "assistant",
-            "content": answer
-        })
-
-    except Exception as e:
-        st.error(
-            f"حدث خطأ: {e}"
-)

@@ -45,7 +45,7 @@ if prompt:
 
     prompt_text = prompt.text
                   
-                            if uploaded_file and uploaded_file.type.startswith("image"):
+                 if uploaded_file and uploaded_file.type.startswith("image"):
             image_file = uploaded_file
 
             image_bytes = image_file.getvalue()

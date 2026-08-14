@@ -206,5 +206,214 @@ def ask_yosef(text, extra_content=None):
 def speak_text(text):
 
     safe_text = str(text)
+# =========================================================
+# خانة الكتابة + الصور + الملفات + الصوت
+# =========================================================
 
+prompt = st.chat_input(
+    "اكتب رسالتك...",
+    accept_file=True,
+    accept_audio=True,
+    file_type=[
+        "png",
+        "jpg",
+        "jpeg",
+        "webp",
+        "txt",
+        "pdf",
+        "docx"
+    ]
+)
+
+
+# =========================================================
+# استقبال الرسالة
+# =========================================================
+
+if prompt:
+
+    try:
+
+        text = prompt.text or ""
+
+        uploaded_file = None
+
+        if prompt.files:
+            uploaded_file = prompt.files[0]
+
+
+        # -------------------------------------------------
+        # لو مفيش كلام ولا ملف
+        # -------------------------------------------------
+
+        if not text and not uploaded_file and not prompt.audio:
+
+            st.warning(
+                "اكتب رسالة أو ارفع صورة أو ملف."
+            )
+
+            st.stop()
+
+
+        # -------------------------------------------------
+        # عرض رسالة المستخدم
+        # -------------------------------------------------
+
+        with st.chat_message("user"):
+
+            if text:
+                st.markdown(text)
+
+            if uploaded_file:
+
+                file_type = uploaded_file.type or ""
+
+                if file_type.startswith("image/"):
+
+                    st.image(uploaded_file)
+
+                else:
+
+                    st.write(
+                        "📎 " + uploaded_file.name
+                    )
+
+
+        # -------------------------------------------------
+        # تجهيز الرسالة
+        # -------------------------------------------------
+
+        content = [
+            {
+                "type": "text",
+                "text": text
+            }
+        ]
+
+
+        # -------------------------------------------------
+        # إرسال الصورة للذكاء الاصطناعي
+        # -------------------------------------------------
+
+        if uploaded_file:
+
+            file_type = uploaded_file.type or ""
+
+            if file_type.startswith("image/"):
+
+                image_bytes = uploaded_file.getvalue()
+
+                image_base64 = base64.b64encode(
+                    image_bytes
+                ).decode("utf-8")
+
+                content.append(
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": (
+                                "data:"
+                                + file_type
+                                + ";base64,"
+                                + image_base64
+                            )
+                        }
+                    }
+                )
+
+
+        # -------------------------------------------------
+        # تاريخ المحادثة
+        # -------------------------------------------------
+
+        api_messages = [
+            {
+                "role": "system",
+                "content": system_prompt
+            }
+        ]
+
+
+        for message in st.session_state.messages:
+
+            api_messages.append(
+                {
+                    "role": message["role"],
+                    "content": message["content"]
+                }
+            )
+
+
+        # -------------------------------------------------
+        # رسالة المستخدم الحالية
+        # -------------------------------------------------
+
+        api_messages.append(
+            {
+                "role": "user",
+                "content": content
+            }
+        )
+
+
+        # -------------------------------------------------
+        # إرسال إلى Yosef AI
+        # -------------------------------------------------
+
+        with st.spinner(
+            "🤖 Yosef AI بيفكر..."
+        ):
+
+            response = client.chat.completions.create(
+                model="openrouter/free",
+                messages=api_messages,
+                max_tokens=800
+            )
+
+
+        # -------------------------------------------------
+        # الحصول على الرد
+        # -------------------------------------------------
+
+        answer = (
+            response.choices[0]
+            .message.content
+            or "لم أتمكن من إنشاء رد."
+        )
+
+
+        # -------------------------------------------------
+        # عرض الرد
+        # -------------------------------------------------
+
+        with st.chat_message("assistant"):
+
+            st.markdown(answer)
+
+
+        # -------------------------------------------------
+        # حفظ المحادثة
+        # -------------------------------------------------
+
+        st.session_state.messages.append(
+            {
+                "role": "user",
+                "content": text
+            }
+        )
+
+        st.session_state.messages.append(
+            {
+                "role": "assistant",
+                "content": answer
+            }
+        )
+
+
+    except Exception as error:
+
+        st.error(
+            "❌ حصل خطأ: "
+            + str(error)
+        )
    

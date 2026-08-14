@@ -46,10 +46,10 @@ if prompt:
     prompt_text = prompt.text
                   
       
-            
-            response = client.chat.completions.create(
+        response = client.chat.completions.create(
     model="openrouter/free",
     messages=api_messages
+        )
             )
     )
 

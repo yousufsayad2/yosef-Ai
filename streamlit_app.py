@@ -34,27 +34,24 @@ uploaded_file = None
 
 camera_image = None
 
-col1, col2 = st.columns([1, 8])
+with st.popover("➕"):
+    if st.button("📷 الكاميرا"):
+        camera_image = st.camera_input("📷 التقط صورة")
 
-with col1:
-    with st.popover("➕"):
-        if st.button("📷 الكاميرا"):
-            camera_image = st.camera_input("📷 التقط صورة")
+    uploaded_image = st.file_uploader(
+        "🖼️ الصور",
+        type=["png", "jpg", "jpeg", "webp"],
+        key="image_upload"
+    )
 
-        uploaded_image = st.file_uploader(
-            "🖼️ الصور",
-            type=["png", "jpg", "jpeg", "webp"],
-            key="image_upload"
-        )
+    uploaded_file = st.file_uploader(
+        "📎 الملفات",
+        type=["txt", "pdf", "docx"],
+        key="file_upload"
+    )
 
-        uploaded_file = st.file_uploader(
-            "📎 الملفات",
-            type=["txt", "pdf", "docx"],
-            key="file_upload"
-        )
-
-        if uploaded_image:
-            uploaded_file = uploaded_image
+    if uploaded_image:
+        uploaded_file = uploaded_image
 
 prompt = st.chat_input("اكتب رسالتك...")
 

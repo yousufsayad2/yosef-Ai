@@ -8,10 +8,7 @@ st.set_page_config(
 
 st.title("🤖 Yosef AI")
 
-api_key = st.text_input(
-    "OpenRouter API Key",
-    type="password"
-)
+api_key = st.secrets["OPENROUTER_API_KEY"]
 
 if api_key:
 

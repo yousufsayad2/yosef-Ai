@@ -60,8 +60,12 @@ if prompt:
     try:
         prompt_text = prompt.text or ""
 
+        # =========================
+        # الصوت → نص
+        # =========================
         if prompt.audio:
             audio_bytes = prompt.audio.getvalue()
+
             audio_base64 = base64.b64encode(
                 audio_bytes
             ).decode("utf-8")
@@ -84,7 +88,9 @@ if prompt:
 
             transcription_response.raise_for_status()
 
-            transcription_data = transcription_response.json()
+            transcription_data = (
+                transcription_response.json()
+            )
 
             prompt_text = transcription_data.get(
                 "text",
@@ -103,7 +109,11 @@ if prompt:
             )
             st.stop()
 
+        # =========================
+        # عرض رسالة المستخدم
+        # =========================
         with st.chat_message("user"):
+
             if prompt_text:
                 st.markdown(prompt_text)
 
@@ -122,6 +132,9 @@ if prompt:
                     "🎙️ تم تحويل الرسالة الصوتية إلى نص."
                 )
 
+        # =========================
+        # تجهيز الرسالة
+        # =========================
         content = [
             {
                 "type": "text",
@@ -130,9 +143,11 @@ if prompt:
         ]
 
         if uploaded_file:
+
             file_type = uploaded_file.type or ""
 
             if file_type.startswith("image/"):
+
                 image_bytes = uploaded_file.getvalue()
 
                 image_base64 = base64.b64encode(
@@ -149,6 +164,9 @@ if prompt:
                     }
                 })
 
+        # =========================
+        # تاريخ المحادثة
+        # =========================
         api_messages = [
             {
                 "role": "system",
@@ -157,6 +175,7 @@ if prompt:
         ]
 
         for message in st.session_state.messages:
+
             api_messages.append({
                 "role": message["role"],
                 "content": message["content"]
@@ -167,6 +186,9 @@ if prompt:
             "content": content
         })
 
+        # =========================
+        # Yosef AI
+        # =========================
         response = client.chat.completions.create(
             model="openrouter/free",
             messages=api_messages,
@@ -178,32 +200,49 @@ if prompt:
             or "لم أتمكن من إنشاء رد."
         )
 
+        # =========================
+        # عرض الرد + الصوت
+        # =========================
         with st.chat_message("assistant"):
+
             st.markdown(answer)
 
             if voice_enabled:
-                speech_response = requests.post(
-                    "https://openrouter.ai/api/v1/audio/speech",
-                    headers={
-                        "Authorization": f"Bearer {api_key}",
-                        "Content-Type": "application/json"
-                    },
-                    json={
-                        "model": "openai/gpt-4o-mini-tts-2025-12-15",
-                        "input": answer,
-                        "voice": "alloy",
-                        "response_format": "mp3"
-                    },
-                    timeout=120
-                )
 
-                speech_response.raise_for_status()
+                with st.spinner("🔊 جاري تحويل الرد إلى صوت..."):
 
-                st.audio(
-                    speech_response.content,
-                    format="audio/mpeg"
-                )
+                    speech_response = requests.post(
+                        "https://openrouter.ai/api/v1/audio/speech",
+                        headers={
+                            "Authorization": f"Bearer {api_key}",
+                            "Content-Type": "application/json"
+                        },
+                        json={
+                            "model": "openai/gpt-4o-mini-tts-2025-12-15",
+                            "input": answer,
+                            "voice": "alloy",
+                            "response_format": "mp3"
+                        },
+                        timeout=120
+                    )
 
+                if speech_response.ok:
+
+                    st.audio(
+                        speech_response.content,
+                        format="audio/mpeg"
+                    )
+
+                else:
+
+                    st.error(
+                        "❌ حصل خطأ في الصوت:\n\n"
+                        + speech_response.text
+                    )
+
+        # =========================
+        # حفظ المحادثة
+        # =========================
         st.session_state.messages.append({
             "role": "user",
             "content": prompt_text
@@ -215,6 +254,7 @@ if prompt:
         })
 
     except Exception as e:
+
         st.error(
             f"حدث خطأ: {e}"
         )

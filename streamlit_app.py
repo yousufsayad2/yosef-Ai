@@ -52,51 +52,46 @@ if prompt:
 
     with st.chat_message("user"):
         st.markdown(prompt)
-        try: 
-           content = [{"type": "text", "text": prompt}]
-             image_file = None
+        try:
+            content = [{"type": "text", "text": prompt}]
+            image_file = None
 
-        if uploaded_file and uploaded_file.type.startswith("image/"):
-            image_file = uploaded_file
-        elif camera_image:
-            image_file = camera_image
+            if uploaded_file and uploaded_file.type.startswith("image/"):
+                image_file = uploaded_file
+            elif camera_image:
+                image_file = camera_image
 
-        if image_file:
-            image_bytes = image_file.getvalue()
-            image_base64 = base64.b64encode(image_bytes).decode("utf-8")
+            if image_file:
+                image_bytes = image_file.getvalue()
+                image_base64 = base64.b64encode(image_bytes).decode("utf-8")
 
-            content.append({
-                "type": "image_url",
-                "image_url": {
-                    "url": f"data:{image_file.type};base64,{image_base64}"
-                }
-            })
-            
+                content.append({
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:{image_file.type};base64,{image_base64}"
+                    }
+                })
 
-        api_messages = [
-            {"role": "system", "content": system_prompt},
-            *st.session_state.messages[:-1],
-            {"role": "user", "content": content}
-        ]
+            api_messages = [
+                {"role": "system", "content": system_prompt},
+                *st.session_state.messages[:-1],
+                {"role": "user", "content": content}
+            ]
 
-        response = client.chat.completions.create(
-            model="openrouter/free",
-            messages=api_messages
-        )
+            response = client.chat.completions.create(
+                model="openrouter/free",
+                messages=api_messages
+            )
 
-        
+            answer = response.choices[0].message.content
 
-        answer = response.choices[0].message.content
-
-        st.session_state.messages.append(
-            {
+            st.session_state.messages.append({
                 "role": "assistant",
                 "content": answer
-            }
-        )
+            })
 
-        with st.chat_message("assistant"):
-            st.markdown(answer)
+            with st.chat_message("assistant"):
+                st.markdown(answer)
 
-    except Exception as e:
-        st.error(f"حدث خطأ: {e}")
+        except Exception as e:
+            st.error(f"حدث خطأ: {e}")

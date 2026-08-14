@@ -44,6 +44,14 @@ if prompt:
         prompt_text = prompt.text or ""
         uploaded_file = prompt.files[0] if prompt.files else None
 
+        # إظهار رسالة المستخدم فورًا
+        with st.chat_message("user"):
+            st.markdown(prompt_text)
+
+            if uploaded_file:
+                if (uploaded_file.type or "").startswith("image/"):
+                    st.image(uploaded_file)
+
         content = [
             {
                 "type": "text",
@@ -90,20 +98,13 @@ if prompt:
 
         answer = response.choices[0].message.content
 
-        with st.chat_message("user"):
-            st.markdown(prompt_text)
-
-            if uploaded_file:
-                if (uploaded_file.type or "").startswith("image/"):
-                    st.image(uploaded_file)
+        with st.chat_message("assistant"):
+            st.markdown(answer)
 
         st.session_state.messages.append({
             "role": "user",
             "content": prompt_text
         })
-
-        with st.chat_message("assistant"):
-            st.markdown(answer)
 
         st.session_state.messages.append({
             "role": "assistant",

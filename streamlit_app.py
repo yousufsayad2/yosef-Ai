@@ -28,14 +28,6 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-
-    /* زر المكالمة */
-    .voice-call-box {
-        text-align: right;
-        margin-bottom: 8px;
-    }
-
-    /* شكل العنوان */
     .yosef-title {
         text-align: center;
         font-size: 32px;
@@ -48,6 +40,10 @@ st.markdown(
         margin-bottom: 20px;
     }
 
+    .voice-call-box {
+        text-align: center;
+        margin: 10px 0;
+    }
     </style>
     """,
     unsafe_allow_html=True
@@ -97,7 +93,7 @@ system_prompt = """
 - استخدم المعلومات المتاحة.
 - لا تخترع معلومات.
 - إذا كانت المعلومات غير كافية، وضح ذلك.
-- لا تذكر للمستخدم تفاصيل البحث الداخلية إلا إذا طلبها.
+- لا تذكر تفاصيل البحث الداخلية للمستخدم إلا إذا طلبها.
 """
 
 
@@ -111,7 +107,10 @@ st.markdown(
 )
 
 st.markdown(
-    '<div class="yosef-subtitle">أهلاً بيك 👋<br>أنا Yosef AI، مساعدك الذكي. اسألني أي حاجة!</div>',
+    '<div class="yosef-subtitle">'
+    'أهلاً بيك 👋<br>'
+    'أنا Yosef AI، مساعدك الذكي. اسألني أي حاجة!'
+    '</div>',
     unsafe_allow_html=True
 )
 
@@ -139,7 +138,6 @@ if st.button(
 for message in st.session_state.messages:
 
     with st.chat_message(message["role"]):
-
         st.markdown(message["content"])
 
 
@@ -155,38 +153,31 @@ def needs_web_search(text):
         "درجة الحرارة",
         "مطر",
         "رياح",
-
         "أخبار",
         "خبر",
         "الأخبار",
         "آخر الأخبار",
         "اخر الاخبار",
-
         "سعر",
         "الأسعار",
         "بكام",
         "سعر الدولار",
         "سعر الذهب",
-
         "اليوم",
         "دلوقتي",
         "الآن",
         "حاليا",
         "حاليًا",
-
         "أحدث",
         "آخر",
         "الجديد",
-
         "موعد",
         "متى",
         "نتيجة",
         "نتائج",
-
         "مباراة",
         "مباريات",
         "ماتش",
-
         "today",
         "now",
         "latest",
@@ -216,12 +207,8 @@ def search_web(query):
 
         response = requests.get(
             "https://html.duckduckgo.com/html/",
-            params={
-                "q": query
-            },
-            headers={
-                "User-Agent": "Mozilla/5.0"
-            },
+            params={"q": query},
+            headers={"User-Agent": "Mozilla/5.0"},
             timeout=15
         )
 
@@ -233,9 +220,7 @@ def search_web(query):
             re.IGNORECASE | re.DOTALL
         )
 
-        matches = pattern.findall(
-            response.text
-        )
+        matches = pattern.findall(response.text)
 
         results = []
 
@@ -247,10 +232,12 @@ def search_web(query):
                 title
             ).strip()
 
-            results.append({
-                "title": clean_title,
-                "href": href
-            })
+            results.append(
+                {
+                    "title": clean_title,
+                    "href": href
+                }
+            )
 
         return results
 
@@ -272,10 +259,7 @@ def ask_yosef(text):
         }
     ]
 
-    # -----------------------------------------
-    # البحث تلقائيًا ومخفيًا
-    # -----------------------------------------
-
+    # البحث التلقائي والمخفي
     if needs_web_search(text):
 
         results = search_web(text)
@@ -289,5 +273,201 @@ def ask_yosef(text):
 
             for result in results:
 
+                title = result.get("title", "")
+                url = result.get("href", "")
+
                 search_text += (
-                    f"{
+                    title
+                    + "\n"
+                    + url
+                    + "\n\n"
+                )
+
+            content.append(
+                {
+                    "type": "text",
+                    "text": search_text
+                }
+            )
+
+    # تاريخ المحادثة
+    api_messages = [
+        {
+            "role": "system",
+            "content": system_prompt
+        }
+    ]
+
+    for message in st.session_state.messages:
+
+        api_messages.append(
+            {
+                "role": message["role"],
+                "content": message["content"]
+            }
+        )
+
+    api_messages.append(
+        {
+            "role": "user",
+            "content": content
+        }
+    )
+
+    # OpenRouter
+    response = client.chat.completions.create(
+        model="openrouter/free",
+        messages=api_messages,
+        max_tokens=800
+    )
+
+    answer = (
+        response.choices[0]
+        .message.content
+        or "لم أتمكن من إنشاء رد."
+    )
+
+    return answer
+
+
+# =========================================================
+# تشغيل الرد الصوتي
+# =========================================================
+
+def speak_text(text):
+
+    safe_text = (
+        text
+        .replace("\\", "\\\\")
+        .replace("`", "\\`")
+        .replace("${", "\\${")
+        .replace("\n", " ")
+        .replace("\r", " ")
+    )
+
+    html = (
+        "<script>"
+        "const text = `"
+        + safe_text
+        + "`;"
+        ""
+        "if ('speechSynthesis' in window) {"
+        ""
+        "window.speechSynthesis.cancel();"
+        ""
+        "const speech = "
+        "new SpeechSynthesisUtterance(text);"
+        ""
+        "speech.lang = 'ar-SA';"
+        "speech.rate = 1.0;"
+        "speech.pitch = 1.0;"
+        ""
+        "window.speechSynthesis.speak(speech);"
+        "}"
+        "</script>"
+    )
+
+    st.components.v1.html(
+        html,
+        height=1
+    )
+
+
+# =========================================================
+# زر المحادثة الصوتية
+# =========================================================
+
+st.markdown(
+    '<div class="voice-call-box">',
+    unsafe_allow_html=True
+)
+
+if not st.session_state.voice_call:
+
+    start_call = st.button(
+        "📞 محادثة صوتية",
+        key="start_voice_call"
+    )
+
+    if start_call:
+
+        st.session_state.voice_call = True
+        st.session_state.audio_frames = []
+
+        st.rerun()
+
+else:
+
+    stop_call = st.button(
+        "🔴 إنهاء المكالمة",
+        key="stop_voice_call"
+    )
+
+    if stop_call:
+
+        st.session_state.voice_call = False
+        st.session_state.audio_frames = []
+
+        st.rerun()
+
+st.markdown(
+    "</div>",
+    unsafe_allow_html=True
+)
+
+
+# =========================================================
+# وضع المحادثة الصوتية
+# =========================================================
+
+if st.session_state.voice_call:
+
+    st.markdown("---")
+
+    st.subheader("📞 محادثة Yosef AI الصوتية")
+
+    st.caption(
+        "اسمح للمتصفح باستخدام الميكروفون واتكلم."
+    )
+
+    # WebRTC
+    ctx = webrtc_streamer(
+        key="yosef_voice_call",
+        mode=WebRtcMode.SENDONLY,
+        media_stream_constraints={
+            "audio": True,
+            "video": False
+        },
+        audio_receiver_size=256
+    )
+
+    # استقبال الصوت
+    if ctx.state.playing:
+
+        try:
+
+            frames = ctx.audio_receiver.get_frames(
+                timeout=1
+            )
+
+            for frame in frames:
+
+                st.session_state.audio_frames.append(
+                    frame
+                )
+
+        except Exception:
+
+            pass
+
+    # إرسال الكلام
+    if st.button(
+        "🎙️ إرسال الكلام إلى Yosef",
+        use_container_width=True
+    ):
+
+        frames = st.session_state.audio_frames
+
+        if not frames:
+
+            st.warning

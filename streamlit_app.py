@@ -72,7 +72,7 @@ if prompt:
                     "url": f"data:{image_file.type};base64,{image_base64}"
                 }
             })
-            })
+            
 
         api_messages = [
             {"role": "system", "content": system_prompt},

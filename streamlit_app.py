@@ -30,7 +30,12 @@ for message in st.session_state.messages:
 if st.button("🆕 محادثة جديدة"):
     st.session_state.messages = []
     st.rerun()
+uploaded_file = st.file_uploader(
+    "📎 ارفع ملف",
+    type=["txt", "pdf", "png", "jpg", "jpeg"]
+)
 
+camera_image = st.camera_input("📷 افتح الكاميرا")
 prompt = st.chat_input("اكتب رسالتك...")
 if prompt:
     st.session_state.messages.append(

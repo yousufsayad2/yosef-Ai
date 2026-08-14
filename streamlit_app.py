@@ -53,7 +53,7 @@ if prompt:
     with st.chat_message("user"):
         st.markdown(prompt)
 
-        try:
+            try:
         content = [{"type": "text", "text": prompt}]
 
         image_file = None
@@ -79,6 +79,11 @@ if prompt:
             *st.session_state.messages[:-1],
             {"role": "user", "content": content}
         ]
+
+        response = client.chat.completions.create(
+            model="openrouter/free",
+            messages=api_messages
+        )
 
         response = client.chat.completions.create(
             model="openrouter/free",

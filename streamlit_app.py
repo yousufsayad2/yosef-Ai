@@ -33,42 +33,37 @@ if st.button("🆕 محادثة جديدة"):
     st.rerun()
 
 prompt = st.chat_input("اكتب رسالتك...")
-
 if prompt:
+    st.session_state.messages.append(
+        {
+            "role": "user",
+            "content": prompt
+        }
+    )
 
-        st.session_state.messages.append(
-            {
-                "role": "user",
-                "content": prompt
-            }
-        )
+    with st.chat_message("user"):
+        st.markdown(prompt)
 
-        with st.chat_message("user"):
-            st.markdown(prompt)
-
-        try:
-                response = client.chat.completions.create(
+    try:
+        response = client.chat.completions.create(
             model="openai/gpt-oss-20b:free",
             messages=[
                 {"role": "system", "content": system_prompt},
                 *st.session_state.messages
             ]
-                )
+        )
 
-            answer = response.choices[0].message.content
+        answer = response.choices[0].message.content
 
-            st.session_state.messages.append(
-                {
-                    "role": "assistant",
-                    "content": answer
-                }
-            )
+        st.session_state.messages.append(
+            {
+                "role": "assistant",
+                "content": answer
+            }
+        )
 
-            with st.chat_message("assistant"):
-                st.markdown(answer)
+        with st.chat_message("assistant"):
+            st.markdown(answer)
 
-        except Exception as e:
-            st.error(f"حدث خطأ: {e}")
-
-else:
-    st.info("🔑 أدخل مفتاح OpenRouter API")
+    except Exception as e:
+        st.error(f"حدث خطأ: {e}")

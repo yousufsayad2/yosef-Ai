@@ -56,19 +56,8 @@ with col1:
         if uploaded_image:
             uploaded_file = uploaded_image
 
-with col2:
-    prompt = st.chat_input("اكتب رسالتك...")
-
-if prompt:
-        
-
-        if uploaded_image:
-            uploaded_file = uploaded_image
-
-with col2:
-    prompt = st.chat_input("اكتب رسالتك...")
-
 prompt = st.chat_input("اكتب رسالتك...")
+
 if prompt:
     st.session_state.messages.append(
         {

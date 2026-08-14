@@ -48,8 +48,9 @@ if prompt:
       
             
             response = client.chat.completions.create(
-        model="openrouter/free",
-        messages=api_messages
+    model="openrouter/free",
+    messages=api_messages
+            )
     )
 
     answer = response.choices[0].message.content

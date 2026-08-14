@@ -31,6 +31,7 @@ if st.button("🆕 محادثة جديدة"):
     st.session_state.messages = []
     st.rerun()
 prompt = st.chat_input(
+prompt = st.chat_input(
     "اكتب رسالتك...",
     accept_file=True,
     file_type=["png", "jpg", "jpeg", "webp", "pdf", "txt", "docx"]
@@ -43,34 +44,20 @@ if prompt:
         uploaded_file = prompt.files[0]
 
     prompt_text = prompt.text
-        {
-            "role": "user",
-            "content": prompt
-        }
-    )
+                  
+                            if uploaded_file and uploaded_file.type.startswith("image"):
+            image_file = uploaded_file
 
-    with st.chat_message("user"):
-        st.markdown(prompt)
-        try:
-            content = [{"type": "text", "text": prompt}]
-            image_file = None
+            image_bytes = image_file.getvalue()
+            image_base64 = base64.b64encode(image_bytes).decode("utf-8")
 
-            if uploaded_file and uploaded_file.type.startswith("image/"):
-                image_file = uploaded_file
-            
+            content.append({
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:{image_file.type};base64,{image_base64}"
+                }
+            })
 
-            if image_file:
-                image_bytes = image_file.getvalue()
-                image_base64 = base64.b64encode(image_bytes).decode("utf-8")
-
-                content.append({
-                    "type": "image_url",
-                    "image_url": {
-                        "url": f"data:{image_file.type};base64,{image_base64}"
-                    }
-                })
-
-            api_messages = [
                 {"role": "system", "content": system_prompt},
                 *st.session_state.messages[:-1],
                 {"role": "user", "content": content}

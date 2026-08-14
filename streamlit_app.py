@@ -30,33 +30,19 @@ for message in st.session_state.messages:
 if st.button("🆕 محادثة جديدة"):
     st.session_state.messages = []
     st.rerun()
+prompt = st.chat_input(
+    "اكتب رسالتك...",
+    accept_file=True,
+    file_type=["png", "jpg", "jpeg", "webp", "pdf", "txt", "docx"]
+)
+
 uploaded_file = None
 
-camera_image = None
-
-with st.popover("➕"):
-    if st.button("📷 الكاميرا"):
-        camera_image = st.camera_input("📷 التقط صورة")
-
-    uploaded_image = st.file_uploader(
-        "🖼️ الصور",
-        type=["png", "jpg", "jpeg", "webp"],
-        key="image_upload"
-    )
-
-    uploaded_file = st.file_uploader(
-        "📎 الملفات",
-        type=["txt", "pdf", "docx"],
-        key="file_upload"
-    )
-
-    if uploaded_image:
-        uploaded_file = uploaded_image
-
-prompt = st.chat_input("اكتب رسالتك...")
-
 if prompt:
-    st.session_state.messages.append(
+    if prompt.files:
+        uploaded_file = prompt.files[0]
+
+    prompt_text = prompt.text
         {
             "role": "user",
             "content": prompt
@@ -71,8 +57,7 @@ if prompt:
 
             if uploaded_file and uploaded_file.type.startswith("image/"):
                 image_file = uploaded_file
-            elif camera_image:
-                image_file = camera_image
+            
 
             if image_file:
                 image_bytes = image_file.getvalue()

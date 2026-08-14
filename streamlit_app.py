@@ -47,15 +47,13 @@ if prompt:
             st.markdown(prompt)
 
         try:
-
-            response = client.chat.completions.create(
-                model="openai/gpt-oss-20b:free",messages=[
-    messages=[
-    {"role": "system", "content": system_prompt},
-    *st.session_state.messages
-],
-
-            )
+                response = client.chat.completions.create(
+            model="openai/gpt-oss-20b:free",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                *st.session_state.messages
+            ]
+                )
 
             answer = response.choices[0].message.content
 

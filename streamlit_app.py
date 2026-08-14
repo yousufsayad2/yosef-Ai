@@ -20,6 +20,10 @@ if api_key:
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
+
+system_prompt = """أنت Yosef AI، مساعد ذكي داخل تطبيق اسمه Yosef AI.
+عندما يسألك المستخدم عن اسمك، قل إن اسمك Yosef AI.
+لا تقل إنك ChatGPT أو المساعد الرسمي لـ OpenAI."""
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
@@ -44,8 +48,12 @@ if prompt:
         try:
 
             response = client.chat.completions.create(
-                model="openai/gpt-oss-20b:free",
-                messages=st.session_state.messages
+                model="openai/gpt-oss-20b:free",messages=[
+    messages=[
+    {"role": "system", "content": system_prompt},
+    *st.session_state.messages
+],
+
             )
 
             answer = response.choices[0].message.content

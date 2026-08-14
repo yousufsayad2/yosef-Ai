@@ -113,7 +113,7 @@ if prompt:
             {
                 "type": "text",
                 "text": prompt_text
-import streamlit as st
+
 from openai import OpenAI
 import base64
 import requests

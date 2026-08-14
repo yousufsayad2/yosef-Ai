@@ -53,9 +53,8 @@ if prompt:
     with st.chat_message("user"):
         st.markdown(prompt)
 
-              :try
-                content = [{"type": "text", "text": prompt}]
-
+                  try:
+        content = [{"type": "text", "text": prompt}]
         image_file = None
 
         if uploaded_file and uploaded_file.type.startswith("image/"):
@@ -72,6 +71,7 @@ if prompt:
                 "image_url": {
                     "url": f"data:{image_file.type};base64,{image_base64}"
                 }
+            })
             })
 
         api_messages = [

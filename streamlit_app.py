@@ -7,7 +7,8 @@ st.set_page_config(
 )
 
 st.title("🤖 Yosef AI")
-
+st.write("أهلاً بيك 👋")
+st.write("أنا Yosef AI، مساعدك الذكي. اسألني أي حاجة!")
 api_key = st.secrets["OPENROUTER_API_KEY"]
 
 if api_key:

@@ -26,9 +26,10 @@ if api_key:
 if st.button("🆕 محادثة جديدة"):
     st.session_state.messages = []
     st.rerun()
-    prompt = st.chat_input("اكتب رسالتك...")
 
-    if prompt:
+prompt = st.chat_input("اكتب رسالتك...")
+
+if prompt:
 
         st.session_state.messages.append(
             {

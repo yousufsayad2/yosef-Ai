@@ -31,7 +31,7 @@ if st.button("🆕 محادثة جديدة"):
     st.session_state.messages = []
     st.rerun()
 uploaded_file = None
-uploaded_file = None
+
 camera_image = None
 
 col1, col2 = st.columns([1, 8])

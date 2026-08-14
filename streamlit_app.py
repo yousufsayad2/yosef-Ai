@@ -30,7 +30,7 @@ for message in st.session_state.messages:
 if st.button("🆕 محادثة جديدة"):
     st.session_state.messages = []
     st.rerun()
-prompt = st.chat_input(
+
 prompt = st.chat_input(
     "اكتب رسالتك...",
     accept_file=True,

@@ -17,7 +17,7 @@ if api_key:
         api_key=api_key,
     )
 
-    if "messages" not in st.session_state:
+if "messages" not in st.session_state:
     st.session_state.messages = []
 system_prompt = """أنت Yosef AI، مساعد ذكي داخل تطبيق اسمه Yosef AI.
 عندما يسألك المستخدم عن اسمك، قل إن اسمك Yosef AI.

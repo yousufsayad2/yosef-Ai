@@ -60,7 +60,7 @@ with col2:
     prompt = st.chat_input("اكتب رسالتك...")
 
 if prompt:
-        )
+        
 
         if uploaded_image:
             uploaded_file = uploaded_image

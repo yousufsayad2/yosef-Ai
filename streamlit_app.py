@@ -46,14 +46,16 @@ if prompt:
     prompt_text = prompt.text
                   
       
-        response = client.chat.completions.create(
-    model="openrouter/free",
-    messages=api_messages
-        )
-            )
-    )
+            api_messages = [
+        {"role": "system", "content": system_prompt},
+        *st.session_state.messages[:-1],
+        {"role": "user", "content": prompt_text}
+    ]
 
-    answer = response.choices[0].message.content
+    response = client.chat.completions.create(
+        model="openrouter/free",
+        messages=api_messages
+    )
 
     st.session_state.messages.append({
         "role": "assistant",

@@ -4,7 +4,18 @@ import base64
 import re
 import requests
 import io
-import speech_recognition as sr
+import threading
+import queue
+import time
+import wave
+import numpy as np
+
+from streamlit_webrtc import (
+    webrtc_streamer,
+    WebRtcMode,
+    create_audio_sink_track,
+    create_pcm_audio_source_track,
+)
 
 
 # =========================================================
@@ -14,7 +25,7 @@ import speech_recognition as sr
 st.set_page_config(
     page_title="Yosef AI",
     page_icon="🤖",
-    layout="centered"
+    layout="centered",
 )
 
 
@@ -36,23 +47,19 @@ st.markdown(
     .yosef-subtitle {
         text-align: center;
         color: #777;
-        margin-bottom: 25px;
+        margin-bottom: 20px;
     }
 
-    .call-row {
-        display: flex;
-        justify-content: flex-end;
-        margin-bottom: 5px;
-    }
-
-    /* نخلي زر المكالمة صغير */
-    div[data-testid="stButton"] button {
-        border-radius: 12px;
+    .call-title {
+        text-align: center;
+        font-size: 22px;
+        font-weight: 700;
+        margin-top: 15px;
     }
 
     </style>
     """,
-    unsafe_allow_html=True
+    unsafe_allow_html=True,
 )
 
 
@@ -64,12 +71,12 @@ api_key = st.secrets["OPENROUTER_API_KEY"]
 
 client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
-    api_key=api_key
+    api_key=api_key,
 )
 
 
 # =========================================================
-# الذاكرة
+# Session State
 # =========================================================
 
 if "messages" not in st.session_state:
@@ -78,9 +85,27 @@ if "messages" not in st.session_state:
 if "voice_call" not in st.session_state:
     st.session_state.voice_call = False
 
+if "voice_job" not in st.session_state:
+    st.session_state.voice_job = None
+
+if "voice_lock" not in st.session_state:
+    st.session_state.voice_lock = threading.Lock()
+
+if "voice_in_queue" not in st.session_state:
+    st.session_state.voice_in_queue = queue.Queue()
+
+if "voice_audio_source" not in st.session_state:
+    st.session_state.voice_audio_source = None
+
+if "voice_last_text" not in st.session_state:
+    st.session_state.voice_last_text = ""
+
+if "voice_last_answer" not in st.session_state:
+    st.session_state.voice_last_answer = ""
+
 
 # =========================================================
-# تعليمات Yosef AI
+# تعليمات Yosef
 # =========================================================
 
 system_prompt = """
@@ -92,11 +117,14 @@ system_prompt = """
 
 أجب باللغة التي يستخدمها المستخدم.
 
+كن طبيعيًا وودودًا ومختصرًا في المحادثة الصوتية.
+لا تكرر كلام المستخدم بدون سبب.
+
 إذا تم إعطاؤك معلومات من البحث على الإنترنت:
 - استخدم المعلومات المتاحة.
-- لا تخترع معلومات غير موجودة.
+- لا تخترع معلومات.
 - إذا كانت المعلومات غير كافية، وضح ذلك.
-- لا تذكر للمستخدم تفاصيل البحث الداخلية إلا إذا طلبها.
+- لا تذكر تفاصيل البحث الداخلية للمستخدم.
 """
 
 
@@ -106,7 +134,7 @@ system_prompt = """
 
 st.markdown(
     '<div class="yosef-title">🤖 Yosef AI</div>',
-    unsafe_allow_html=True
+    unsafe_allow_html=True,
 )
 
 st.markdown(
@@ -114,7 +142,7 @@ st.markdown(
     'أهلاً بيك 👋<br>'
     'أنا Yosef AI، مساعدك الذكي. اسألني أي حاجة!'
     '</div>',
-    unsafe_allow_html=True
+    unsafe_allow_html=True,
 )
 
 
@@ -124,23 +152,15 @@ st.markdown(
 
 if st.button(
     "🆕 محادثة جديدة",
-    use_container_width=True
+    use_container_width=True,
 ):
 
     st.session_state.messages = []
     st.session_state.voice_call = False
+    st.session_state.voice_last_text = ""
+    st.session_state.voice_last_answer = ""
 
     st.rerun()
-
-
-# =========================================================
-# عرض المحادثة
-# =========================================================
-
-for message in st.session_state.messages:
-
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
 
 
 # =========================================================
@@ -155,38 +175,31 @@ def needs_web_search(text):
         "درجة الحرارة",
         "مطر",
         "رياح",
-
         "أخبار",
         "خبر",
         "الأخبار",
         "آخر الأخبار",
         "اخر الاخبار",
-
         "سعر",
         "الأسعار",
         "بكام",
         "سعر الدولار",
         "سعر الذهب",
-
         "اليوم",
         "دلوقتي",
         "الآن",
         "حاليا",
         "حاليًا",
-
         "أحدث",
         "آخر",
         "الجديد",
-
         "موعد",
         "متى",
         "نتيجة",
         "نتائج",
-
         "مباراة",
         "مباريات",
         "ماتش",
-
         "today",
         "now",
         "latest",
@@ -195,7 +208,7 @@ def needs_web_search(text):
         "price",
         "current",
         "score",
-        "match"
+        "match",
     ]
 
     text_lower = text.lower()
@@ -207,7 +220,7 @@ def needs_web_search(text):
 
 
 # =========================================================
-# البحث على الإنترنت
+# البحث
 # =========================================================
 
 def search_web(query):
@@ -217,12 +230,12 @@ def search_web(query):
         response = requests.get(
             "https://html.duckduckgo.com/html/",
             params={
-                "q": query
+                "q": query,
             },
             headers={
-                "User-Agent": "Mozilla/5.0"
+                "User-Agent": "Mozilla/5.0",
             },
-            timeout=15
+            timeout=15,
         )
 
         if response.status_code != 200:
@@ -230,7 +243,7 @@ def search_web(query):
 
         pattern = re.compile(
             r'class="result__a"[^>]*href="([^"]+)"[^>]*>(.*?)</a>',
-            re.IGNORECASE | re.DOTALL
+            re.IGNORECASE | re.DOTALL,
         )
 
         matches = pattern.findall(
@@ -241,16 +254,16 @@ def search_web(query):
 
         for href, title in matches[:5]:
 
-            clean_title = re.sub(
+            title = re.sub(
                 r"<.*?>",
                 "",
-                title
+                title,
             ).strip()
 
             results.append(
                 {
-                    "title": clean_title,
-                    "href": href
+                    "title": title,
+                    "href": href,
                 }
             )
 
@@ -261,7 +274,7 @@ def search_web(query):
 
 
 # =========================================================
-# سؤال Yosef AI
+# سؤال Yosef
 # =========================================================
 
 def ask_yosef(text):
@@ -269,13 +282,9 @@ def ask_yosef(text):
     content = [
         {
             "type": "text",
-            "text": text
+            "text": text,
         }
     ]
-
-    # -----------------------------------------
-    # البحث تلقائيًا ومخفيًا
-    # -----------------------------------------
 
     if needs_web_search(text):
 
@@ -285,19 +294,19 @@ def ask_yosef(text):
 
             search_text = (
                 "\n\n"
-                "معلومات حديثة من البحث على الإنترنت:\n\n"
+                "معلومات حديثة من البحث:\n\n"
             )
 
             for result in results:
 
                 title = result.get(
                     "title",
-                    ""
+                    "",
                 )
 
                 url = result.get(
                     "href",
-                    ""
+                    "",
                 )
 
                 search_text += (
@@ -310,19 +319,14 @@ def ask_yosef(text):
             content.append(
                 {
                     "type": "text",
-                    "text": search_text
+                    "text": search_text,
                 }
             )
-
-
-    # -----------------------------------------
-    # تاريخ المحادثة
-    # -----------------------------------------
 
     api_messages = [
         {
             "role": "system",
-            "content": system_prompt
+            "content": system_prompt,
         }
     ]
 
@@ -331,231 +335,521 @@ def ask_yosef(text):
         api_messages.append(
             {
                 "role": message["role"],
-                "content": message["content"]
+                "content": message["content"],
             }
         )
 
     api_messages.append(
         {
             "role": "user",
-            "content": content
+            "content": content,
         }
     )
-
-
-    # -----------------------------------------
-    # OpenRouter
-    # -----------------------------------------
 
     response = client.chat.completions.create(
         model="openrouter/free",
         messages=api_messages,
-        max_tokens=800
+        max_tokens=500,
     )
 
-    answer = (
+    return (
         response.choices[0]
         .message.content
-        or "لم أتمكن من إنشاء رد."
-    )
-
-    return answer
-
-
-# =========================================================
-# تشغيل الرد الصوتي من المتصفح
-# =========================================================
-
-def speak_text(text):
-
-    safe_text = (
-        text
-        .replace("\\", "\\\\")
-        .replace("`", "\\`")
-        .replace("${", "\\${")
-        .replace("\n", " ")
-        .replace("\r", " ")
-    )
-
-    html = (
-        "<script>"
-        "const text = `"
-        + safe_text
-        + "`;"
-        ""
-        "if ('speechSynthesis' in window) {"
-        ""
-        "window.speechSynthesis.cancel();"
-        ""
-        "const speech = "
-        "new SpeechSynthesisUtterance(text);"
-        ""
-        "speech.lang = 'ar-SA';"
-        "speech.rate = 1.0;"
-        "speech.pitch = 1.0;"
-        ""
-        "window.speechSynthesis.speak(speech);"
-        "}"
-        "</script>"
-    )
-
-    st.components.v1.html(
-        html,
-        height=1
+        or "مش عارف أجاوب على ده دلوقتي."
     )
 
 
 # =========================================================
-# زر المكالمة الصوتية
+# OpenRouter STT
 # =========================================================
 
-st.markdown(
-    '<div class="call-row">',
-    unsafe_allow_html=True
-)
+def transcribe_wav(wav_bytes):
+
+    audio_b64 = base64.b64encode(
+        wav_bytes
+    ).decode("utf-8")
+
+    response = requests.post(
+        "https://openrouter.ai/api/v1/audio/transcriptions",
+        headers={
+            "Authorization": "Bearer " + api_key,
+            "Content-Type": "application/json",
+        },
+        json={
+            "model": "openai/whisper-1",
+            "input_audio": {
+                "data": audio_b64,
+                "format": "wav",
+            },
+            "language": "ar",
+        },
+        timeout=60,
+    )
+
+    response.raise_for_status()
+
+    data = response.json()
+
+    return data.get(
+        "text",
+        "",
+    ).strip()
+
+
+# =========================================================
+# OpenRouter TTS
+# =========================================================
+
+def make_speech(text):
+
+    response = requests.post(
+        "https://openrouter.ai/api/v1/audio/speech",
+        headers={
+            "Authorization": "Bearer " + api_key,
+            "Content-Type": "application/json",
+        },
+        json={
+            "model": "openai/gpt-4o-mini-tts-2025-12-15",
+            "input": text,
+            "voice": "alloy",
+            "response_format": "pcm",
+        },
+        timeout=60,
+    )
+
+    response.raise_for_status()
+
+    return response.content
+
+
+# =========================================================
+# تحويل PCM إلى int16
+# =========================================================
+
+def pcm_to_numpy(pcm_bytes):
+
+    if not pcm_bytes:
+        return np.zeros(
+            0,
+            dtype=np.int16,
+        )
+
+    return np.frombuffer(
+        pcm_bytes,
+        dtype=np.int16,
+    )
+
+
+# =========================================================
+# تحويل WebRTC Frame إلى PCM
+# =========================================================
+
+def frame_to_pcm(frame):
+
+    array = frame.to_ndarray()
+
+    if array.ndim == 2:
+
+        if array.shape[0] == 1:
+            array = array[0]
+
+        elif array.shape[1] == 1:
+            array = array[:, 0]
+
+        else:
+            array = array.mean(
+                axis=0
+            )
+
+    array = np.asarray(
+        array,
+        dtype=np.int16,
+    )
+
+    return array
+
+
+# =========================================================
+# WAV
+# =========================================================
+
+def pcm_to_wav(
+    pcm_bytes,
+    sample_rate,
+):
+
+    buffer = io.BytesIO()
+
+    with wave.open(
+        buffer,
+        "wb",
+    ) as wav_file:
+
+        wav_file.setnchannels(1)
+        wav_file.setsampwidth(2)
+        wav_file.setframerate(sample_rate)
+
+        wav_file.writeframes(
+            pcm_bytes
+        )
+
+    return buffer.getvalue()
+
+
+# =========================================================
+# عامل المحادثة الصوتية
+# =========================================================
+
+def voice_worker(
+    input_queue,
+    output_source,
+    stop_event,
+):
+
+    speech_buffer = []
+
+    sample_rate = 48000
+
+    speaking = False
+    last_voice_time = time.time()
+
+    silence_seconds = 0.85
+
+    min_utterance_seconds = 0.45
+
+    while not stop_event.is_set():
+
+        try:
+
+            frame = input_queue.get(
+                timeout=0.1
+            )
+
+        except queue.Empty:
+
+            continue
+
+        try:
+
+            pcm = frame_to_pcm(
+                frame
+            )
+
+            sample_rate = (
+                frame.sample_rate
+            )
+
+            if len(pcm) == 0:
+                continue
+
+            rms = float(
+                np.sqrt(
+                    np.mean(
+                        pcm.astype(
+                            np.float32
+                        ) ** 2
+                    )
+                )
+            )
+
+            # مستوى الصوت
+            voice_detected = rms > 700
+
+            if voice_detected:
+
+                speaking = True
+                last_voice_time = time.time()
+
+                speech_buffer.append(
+                    pcm
+                )
+
+            elif speaking:
+
+                speech_buffer.append(
+                    pcm
+                )
+
+                silence_duration = (
+                    time.time()
+                    - last_voice_time
+                )
+
+                if silence_duration >= silence_seconds:
+
+                    audio = np.concatenate(
+                        speech_buffer
+                    )
+
+                    speech_buffer = []
+                    speaking = False
+
+                    duration = (
+                        len(audio)
+                        / float(sample_rate)
+                    )
+
+                    if duration < min_utterance_seconds:
+                        continue
+
+                    wav_bytes = pcm_to_wav(
+                        audio.tobytes(),
+                        sample_rate,
+                    )
+
+                    try:
+
+                        spoken_text = (
+                            transcribe_wav(
+                                wav_bytes
+                            )
+                        )
+
+                    except Exception:
+
+                        continue
+
+                    if not spoken_text:
+                        continue
+
+                    try:
+
+                        answer = ask_yosef(
+                            spoken_text
+                        )
+
+                    except Exception:
+
+                        continue
+
+                    try:
+
+                        pcm_reply = make_speech(
+                            answer
+                        )
+
+                        output_source.push(
+                            pcm_to_numpy(
+                                pcm_reply
+                            )
+                        )
+
+                    except Exception:
+
+                        continue
+
+        except Exception:
+
+            continue
+
+
+# =========================================================
+# إنشاء موارد المكالمة
+# =========================================================
+
+def start_voice_resources():
+
+    if (
+        st.session_state.voice_audio_source
+        is None
+    ):
+
+        st.session_state.voice_audio_source = (
+            create_pcm_audio_source_track(
+                key="yosef-output",
+                sample_rate=24000,
+                ptime=20,
+                lifecycle_scope="streamlit-session",
+            )
+        )
+
+    if (
+        st.session_state.voice_job
+        is None
+    ):
+
+        stop_event = threading.Event()
+
+        worker = threading.Thread(
+            target=voice_worker,
+            args=(
+                st.session_state.voice_in_queue,
+                st.session_state.voice_audio_source,
+                stop_event,
+            ),
+            daemon=True,
+        )
+
+        worker.start()
+
+        st.session_state.voice_job = (
+            stop_event,
+            worker,
+        )
+
+
+# =========================================================
+# إيقاف المكالمة
+# =========================================================
+
+def stop_voice_resources():
+
+    job = st.session_state.voice_job
+
+    if job:
+
+        stop_event, worker = job
+
+        stop_event.set()
+
+        st.session_state.voice_job = None
+
+    if (
+        st.session_state.voice_audio_source
+        is not None
+    ):
+
+        try:
+
+            st.session_state.voice_audio_source.clear()
+
+        except Exception:
+
+            pass
+
+        st.session_state.voice_audio_source = None
+
+
+# =========================================================
+# عرض المحادثة السابقة
+# =========================================================
+
+for message in st.session_state.messages:
+
+    with st.chat_message(
+        message["role"]
+    ):
+
+        st.markdown(
+            message["content"]
+        )
+
+
+# =========================================================
+# زر المكالمة
+# =========================================================
 
 if not st.session_state.voice_call:
 
     call_button = st.button(
-        "📞",
-        key="voice_call_start",
-        help="بدء محادثة صوتية"
+        "📞 بدء مكالمة صوتية",
+        use_container_width=True,
     )
 
     if call_button:
 
         st.session_state.voice_call = True
 
+        start_voice_resources()
+
         st.rerun()
 
 else:
 
-    call_button = st.button(
-        "🔴",
-        key="voice_call_stop",
-        help="إنهاء المحادثة الصوتية"
+    st.markdown(
+        '<div class="call-title">'
+        '📞 Yosef AI بيتكلم معاك'
+        '</div>',
+        unsafe_allow_html=True,
     )
 
-    if call_button:
+    stop_button = st.button(
+        "🔴 إنهاء المكالمة",
+        use_container_width=True,
+    )
+
+    if stop_button:
 
         st.session_state.voice_call = False
 
-        st.rerun()
+        stop_voice_resources()
 
-st.markdown(
-    "</div>",
-    unsafe_allow_html=True
-)
+        st.rerun()
 
 
 # =========================================================
-# المحادثة الصوتية
+# وضع المكالمة
 # =========================================================
 
 if st.session_state.voice_call:
 
-    st.info(
-        "📞 المحادثة الصوتية مفعّلة — سجل رسالتك من الميكروفون."
+    start_voice_resources()
+
+    audio_sink = create_audio_sink_track(
+        key="yosef-input",
+        lifecycle_scope="streamlit-session",
     )
 
-    voice_audio = st.audio_input(
-        "🎙️"
+    ctx = webrtc_streamer(
+        key="yosef-realtime-call",
+        mode=WebRtcMode.SENDRECV,
+        media_stream_constraints={
+            "audio": True,
+            "video": False,
+        },
+        sink_audio_track=audio_sink,
+        source_audio_track=(
+            st.session_state.voice_audio_source
+        ),
+        rtc_configuration={
+            "iceServers": [
+                {
+                    "urls": [
+                        "stun:stun.l.google.com:19302"
+                    ]
+                }
+            ]
+        },
+        media_stream_constraints={
+            "audio": True,
+            "video": False,
+        },
+        sendback_audio=True,
+        async_processing=True,
     )
 
-    if voice_audio:
+    if ctx.state.playing:
 
         try:
 
-            audio_bytes = voice_audio.getvalue()
+            while True:
 
-            audio_buffer = io.BytesIO(
-                audio_bytes
-            )
-
-            recognizer = sr.Recognizer()
-
-            with sr.AudioFile(
-                audio_buffer
-            ) as source:
-
-                audio_data = recognizer.record(
-                    source
-                )
-
-            with st.spinner(
-                "🎧 Yosef AI بيسمعك..."
-            ):
-
-                spoken_text = (
-                    recognizer.recognize_google(
-                        audio_data,
-                        language="ar-EG"
+                frames = (
+                    audio_sink.get_frames(
+                        timeout=0.05
                     )
                 )
 
-            with st.chat_message("user"):
+                if not frames:
+                    break
 
-                st.markdown(
-                    spoken_text
-                )
+                for frame in frames:
 
-            with st.spinner(
-                "🤖 Yosef AI بيفكر..."
-            ):
+                    st.session_state.voice_in_queue.put(
+                        frame
+                    )
 
-                answer = ask_yosef(
-                    spoken_text
-                )
+        except Exception:
 
-            with st.chat_message("assistant"):
+            pass
 
-                st.markdown(
-                    answer
-                )
-
-                speak_text(
-                    answer
-                )
-
-            st.session_state.messages.append(
-                {
-                    "role": "user",
-                    "content": spoken_text
-                }
-            )
-
-            st.session_state.messages.append(
-                {
-                    "role": "assistant",
-                    "content": answer
-                }
-
-            )
-
-            st.rerun()
-
-        except sr.UnknownValueError:
-
-            st.error(
-                "❌ مش قادر أفهم التسجيل. جرّب تتكلم أوضح."
-            )
-
-        except sr.RequestError:
-
-            st.error(
-                "❌ خدمة التعرف على الصوت غير متاحة حاليًا."
-            )
-
-        except Exception as e:
-
-            st.error(
-                "❌ حصل خطأ في المحادثة الصوتية: "
-                + str(e)
-            )
+    st.caption(
+        "🎙️ اتكلم بشكل طبيعي. لما تسكت لحظة، Yosef هيرد عليك."
+    )
 
 
 # =========================================================
-# خانة الشات الرئيسية
+# الشات العادي
 # =========================================================
 
 prompt = st.chat_input(
@@ -569,13 +863,13 @@ prompt = st.chat_input(
         "webp",
         "txt",
         "pdf",
-        "docx"
-    ]
+        "docx",
+    ],
 )
 
 
 # =========================================================
-# معالجة رسالة الشات
+# معالجة الشات
 # =========================================================
 
 if prompt:
@@ -590,64 +884,31 @@ if prompt:
             else None
         )
 
-
         # -----------------------------------------
-        # تحويل تسجيل الميكروفون إلى نص
+        # صوت عادي
         # -----------------------------------------
 
         if prompt.audio:
 
+            audio_bytes = (
+                prompt.audio.getvalue()
+            )
+
             try:
 
-                audio_bytes = (
-                    prompt.audio.getvalue()
-                )
-
-                audio_buffer = io.BytesIO(
+                prompt_text = transcribe_wav(
                     audio_bytes
                 )
 
-                recognizer = sr.Recognizer()
-
-                with sr.AudioFile(
-                    audio_buffer
-                ) as source:
-
-                    audio_data = recognizer.record(
-                        source
-                    )
-
-                with st.spinner(
-                    "🎙️ جاري تحويل صوتك إلى نص..."
-                ):
-
-                    prompt_text = (
-                        recognizer.recognize_google(
-                            audio_data,
-                            language="ar-EG"
-                        )
-                    )
-
-            except sr.UnknownValueError:
+            except Exception as e:
 
                 st.error(
-                    "❌ مش قادر أفهم التسجيل."
+                    "❌ تعذر تحويل التسجيل إلى نص: "
+                    + str(e)
                 )
 
                 st.stop()
 
-            except sr.RequestError:
-
-                st.error(
-                    "❌ خدمة تحويل الصوت إلى نص غير متاحة."
-                )
-
-                st.stop()
-
-
-        # -----------------------------------------
-        # التأكد من الرسالة
-        # -----------------------------------------
 
         if not prompt_text and not uploaded_file:
 
@@ -659,7 +920,7 @@ if prompt:
 
 
         # -----------------------------------------
-        # عرض رسالة المستخدم
+        # المستخدم
         # -----------------------------------------
 
         with st.chat_message("user"):
@@ -693,13 +954,13 @@ if prompt:
 
 
         # -----------------------------------------
-        # محتوى الرسالة
+        # المحتوى
         # -----------------------------------------
 
         content = [
             {
                 "type": "text",
-                "text": prompt_text
+                "text": prompt_text,
             }
         ]
 
@@ -718,13 +979,9 @@ if prompt:
                 "image/"
             ):
 
-                image_bytes = (
-                    uploaded_file.getvalue()
-                )
-
                 image_base64 = (
                     base64.b64encode(
-                        image_bytes
+                        uploaded_file.getvalue()
                     ).decode("utf-8")
                 )
 
@@ -738,13 +995,13 @@ if prompt:
                                 + ";base64,"
                                 + image_base64
                             )
-                        }
+                        },
                     }
                 )
 
 
         # -----------------------------------------
-        # البحث التلقائي
+        # البحث
         # -----------------------------------------
 
         if prompt_text and needs_web_search(
@@ -764,39 +1021,35 @@ if prompt:
 
                 for result in results:
 
-                    title = result.get(
-                        "title",
-                        ""
-                    )
-
-                    url = result.get(
-                        "href",
-                        ""
-                    )
-
                     search_text += (
-                        title
+                        result.get(
+                            "title",
+                            "",
+                        )
                         + "\n"
-                        + url
+                        + result.get(
+                            "href",
+                            "",
+                        )
                         + "\n\n"
                     )
 
                 content.append(
                     {
                         "type": "text",
-                        "text": search_text
+                        "text": search_text,
                     }
                 )
 
 
         # -----------------------------------------
-        # تاريخ المحادثة
+        # الرسائل
         # -----------------------------------------
 
         api_messages = [
             {
                 "role": "system",
-                "content": system_prompt
+                "content": system_prompt,
             }
         ]
 
@@ -805,20 +1058,20 @@ if prompt:
             api_messages.append(
                 {
                     "role": message["role"],
-                    "content": message["content"]
+                    "content": message["content"],
                 }
             )
 
         api_messages.append(
             {
                 "role": "user",
-                "content": content
+                "content": content,
             }
         )
 
 
         # -----------------------------------------
-        # Yosef AI
+        # AI
         # -----------------------------------------
 
         with st.spinner(
@@ -828,9 +1081,8 @@ if prompt:
             response = client.chat.completions.create(
                 model="openrouter/free",
                 messages=api_messages,
-                max_tokens=800
+                max_tokens=800,
             )
-
 
         answer = (
             response.choices[0]
@@ -840,10 +1092,12 @@ if prompt:
 
 
         # -----------------------------------------
-        # عرض الرد
+        # الرد
         # -----------------------------------------
 
-        with st.chat_message("assistant"):
+        with st.chat_message(
+            "assistant"
+        ):
 
             st.markdown(
                 answer
@@ -851,20 +1105,20 @@ if prompt:
 
 
         # -----------------------------------------
-        # حفظ المحادثة
+        # حفظ
         # -----------------------------------------
 
         st.session_state.messages.append(
             {
                 "role": "user",
-                "content": prompt_text
+                "content": prompt_text,
             }
         )
 
         st.session_state.messages.append(
             {
                 "role": "assistant",
-                "content": answer
+                "content": answer,
             }
         )
 
@@ -874,4 +1128,4 @@ if prompt:
         st.error(
             "حدث خطأ: "
             + str(e)
-        )
+                    )

@@ -23,7 +23,9 @@ if api_key:
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
-
+if st.button("🆕 محادثة جديدة"):
+    st.session_state.messages = []
+    st.rerun()
     prompt = st.chat_input("اكتب رسالتك...")
 
     if prompt:

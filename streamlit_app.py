@@ -31,17 +31,25 @@ if st.button("🆕 محادثة جديدة"):
     st.session_state.messages = []
     st.rerun()
 with st.popover("➕"):
-    uploaded_file = st.file_uploader(
-        "📎 صورة أو مستند",
-        type=["txt", "pdf", "png", "jpg", "jpeg"]
-    )
+    camera_image = None
 
     if st.button("📷 الكاميرا"):
-        st.session_state.show_camera = True
-camera_image = None
+        camera_image = st.camera_input("📷 التقط صورة")
 
-if st.session_state.get("show_camera", False):
-    camera_image = st.camera_input("📷 صورة")
+    uploaded_image = st.file_uploader(
+        "🖼️ الصور",
+        type=["png", "jpg", "jpeg", "webp"],
+        key="image_upload"
+    )
+
+    uploaded_file = st.file_uploader(
+        "📎 الملفات",
+        type=["txt", "pdf", "docx"],
+        key="file_upload"
+    )
+
+    if uploaded_image:
+        uploaded_file = uploaded_image
 prompt = st.chat_input("اكتب رسالتك...")
 if prompt:
     st.session_state.messages.append(

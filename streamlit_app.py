@@ -54,7 +54,7 @@ if prompt:
         st.markdown(prompt)
         try: 
            content = [{"type": "text", "text": prompt}]
-        image_file = None
+             image_file = None
 
         if uploaded_file and uploaded_file.type.startswith("image/"):
             image_file = uploaded_file

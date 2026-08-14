@@ -4,10 +4,7 @@ import base64
 import re
 import requests
 import io
-import wave
 import speech_recognition as sr
-
-from streamlit_webrtc import webrtc_streamer, WebRtcMode
 
 
 # =========================================================
@@ -72,9 +69,6 @@ if "messages" not in st.session_state:
 if "voice_call" not in st.session_state:
     st.session_state.voice_call = False
 
-if "audio_frames" not in st.session_state:
-    st.session_state.audio_frames = []
-
 
 # =========================================================
 # تعليمات Yosef AI
@@ -131,92 +125,4 @@ if st.button(
 ):
 
     st.session_state.messages = []
-    st.session_state.voice_call = False
-    st.session_state.audio_frames = []
-
-    st.rerun()
-
-
-# =========================================================
-# زر المحادثة الصوتية
-# =========================================================
-
-if not st.session_state.voice_call:
-
-    if st.button(
-        "📞 محادثة صوتية",
-        use_container_width=True,
-        key="start_voice_call"
-    ):
-
-        st.session_state.voice_call = True
-        st.session_state.audio_frames = []
-
-        st.rerun()
-
-else:
-
-    if st.button(
-        "🔴 إنهاء المحادثة الصوتية",
-        use_container_width=True,
-        key="stop_voice_call"
-    ):
-
-        st.session_state.voice_call = False
-        st.session_state.audio_frames = []
-
-        st.rerun()
-
-
-# =========================================================
-# دالة البحث
-# =========================================================
-
-def needs_web_search(text):
-
-    keywords = [
-        "الطقس",
-        "الجو",
-        "درجة الحرارة",
-        "مطر",
-        "رياح",
-
-        "أخبار",
-        "خبر",
-        "الأخبار",
-        "آخر الأخبار",
-        "اخر الاخبار",
-
-        "سعر",
-        "الأسعار",
-        "بكام",
-        "سعر الدولار",
-        "سعر الذهب",
-
-        "اليوم",
-        "دلوقتي",
-        "الآن",
-        "حاليا",
-        "حاليًا",
-
-        "أحدث",
-        "آخر",
-        "الجديد",
-
-        "موعد",
-        "متى",
-        "نتيجة",
-        "نتائج",
-
-        "مباراة",
-        "مباريات",
-        "ماتش",
-
-        "today",
-        "now",
-        "latest",
-        "news",
-        "weather",
-        "price",
-        "current",
-        "score
+    st.session_state

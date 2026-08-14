@@ -39,8 +39,9 @@ with st.popover("➕"):
     if st.button("📷 الكاميرا"):
         st.session_state.show_camera = True
 camera_image = None
-    if st.session_state.get("show_camera", False):
-        camera_image = st.camera_input("📷 التقط صورة")
+
+if st.session_state.get("show_camera", False):
+    camera_image = st.camera_input("📷 صورة")
 prompt = st.chat_input("اكتب رسالتك...")
 if prompt:
     st.session_state.messages.append(

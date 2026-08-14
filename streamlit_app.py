@@ -3,20 +3,35 @@ from openai import OpenAI
 import base64
 import io
 import json
+import re
+import requests
 import speech_recognition as sr
 import streamlit.components.v1 as components
-from ddgs import DDGS
 
+
+# =========================================================
+# إعداد الصفحة
+# =========================================================
 
 st.set_page_config(
     page_title="Yosef AI",
-    page_icon="🤖"
+    page_icon="🤖",
+    layout="centered"
 )
+
+
+# =========================================================
+# العنوان
+# =========================================================
 
 st.title("🤖 Yosef AI")
 st.write("أهلاً بيك 👋")
 st.write("أنا Yosef AI، مساعدك الذكي. اسألني أي حاجة!")
 
+
+# =========================================================
+# OpenRouter
+# =========================================================
 
 api_key = st.secrets["OPENROUTER_API_KEY"]
 
@@ -26,9 +41,17 @@ client = OpenAI(
 )
 
 
+# =========================================================
+# الذاكرة
+# =========================================================
+
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+
+# =========================================================
+# تعليمات Yosef AI
+# =========================================================
 
 system_prompt = """
 أنت Yosef AI، مساعد ذكي داخل تطبيق اسمه Yosef AI.
@@ -39,61 +62,95 @@ system_prompt = """
 
 أجب باللغة التي يستخدمها المستخدم.
 
-إذا تم إعطاؤك معلومات من البحث على الإنترنت،
-استخدمها للإجابة ولا تخترع معلومات.
+إذا تم إعطاؤك معلومات من البحث على الإنترنت:
+- استخدم المعلومات المتاحة.
+- لا تخترع معلومات غير موجودة.
+- إذا كانت المعلومات غير كافية، وضح ذلك.
+- بالنسبة للمعلومات الحالية مثل الطقس والأخبار والأسعار، اعتمد على نتائج البحث عند توفرها.
 """
 
 
+# =========================================================
+# عرض المحادثة السابقة
+# =========================================================
+
 for message in st.session_state.messages:
+
     with st.chat_message(message["role"]):
+
         st.markdown(message["content"])
 
 
+# =========================================================
+# محادثة جديدة
+# =========================================================
+
 if st.button("🆕 محادثة جديدة"):
+
     st.session_state.messages = []
+
     st.rerun()
 
 
-# أدوات صغيرة
-col1, col2 = st.columns(2)
-
-with col1:
-    web_enabled = st.toggle(
-        "🔎 بحث",
-        value=True
-    )
-
-with col2:
-    voice_enabled = st.toggle(
-        "🔊 صوت الرد",
-        value=False
-    )
-
+# =========================================================
+# تحديد الأسئلة التي تحتاج بحث
+# =========================================================
 
 def needs_web_search(text):
 
     keywords = [
+
+        # الطقس
         "الطقس",
         "الجو",
         "درجة الحرارة",
+        "حرارة",
+        "هتمطر",
+        "مطر",
+        "رياح",
+
+        # الأخبار
         "أخبار",
         "خبر",
         "الأخبار",
+        "اخر الاخبار",
+        "آخر الأخبار",
+
+        # الأسعار
         "سعر",
         "الأسعار",
+        "كام",
+        "بكام",
+        "سعر الدولار",
+        "سعر الذهب",
+
+        # الوقت الحالي
         "اليوم",
         "دلوقتي",
         "الآن",
         "حاليا",
         "حاليًا",
+        "حالياً",
+
+        # الجديد
         "أحدث",
         "آخر",
+        "الجديد",
+
+        # مواعيد ونتائج
         "موعد",
         "متى",
         "نتيجة",
         "نتائج",
+
+        # الرياضة
         "مباراة",
         "مباريات",
+        "ماتش",
+        "ماتشات",
+        "الدوري",
+
+        # English
         "today",
         "now",
         "latest",
@@ -101,36 +158,87 @@ def needs_web_search(text):
         "weather",
         "price",
         "prices",
-        "current"
+        "current",
+        "score",
+        "match"
     ]
 
     text_lower = text.lower()
 
     for keyword in keywords:
+
         if keyword in text_lower:
             return True
 
     return False
 
 
+# =========================================================
+# بحث بسيط بدون ddgs
+# =========================================================
+
 def search_web(query):
 
     try:
-        with DDGS(timeout=10) as ddgs:
-            results = list(
-                ddgs.text(
-                    query,
-                    region="wt-wt",
-                    safesearch="moderate",
-                    max_results=5
+
+        url = "https://html.duckduckgo.com/html/"
+
+        response = requests.get(
+            url,
+            params={
+                "q": query
+            },
+            headers={
+                "User-Agent": (
+                    "Mozilla/5.0 "
+                    "(Linux; Android 10) "
+                    "AppleWebKit/537.36 "
+                    "Chrome/120 Mobile Safari/537.36"
                 )
+            },
+            timeout=15
+        )
+
+        if response.status_code != 200:
+            return []
+
+        html = response.text
+
+        results = []
+
+        pattern = re.compile(
+            r'class="result__a"[^>]*href="([^"]+)"[^>]*>(.*?)</a>',
+            re.IGNORECASE | re.DOTALL
+        )
+
+        matches = pattern.findall(html)
+
+        for href, title in matches[:5]:
+
+            title = re.sub(
+                r"<.*?>",
+                "",
+                title
             )
+
+            title = title.strip()
+
+            results.append({
+                "title": title,
+                "href": href
+            })
 
         return results
 
     except Exception:
+
         return []
 
+
+# =========================================================
+# خانة الكتابة
+# الميكروفون سيظهر داخلها تلقائياً
+# =========================================================
 
 prompt = st.chat_input(
     "اكتب رسالتك أو سجل صوتك...",
@@ -148,139 +256,433 @@ prompt = st.chat_input(
 )
 
 
+# =========================================================
+# عند إرسال رسالة
+# =========================================================
+
 if prompt:
 
-    prompt_text = prompt.text or ""
+    try:
 
-    uploaded_file = (
-        prompt.files[0]
-        if prompt.files
-        else None
-    )
+        # =====================================================
+        # النص
+        # =====================================================
 
-
-    # الصوت → نص
-    if prompt.audio:
-
-        with st.spinner("🎙️ جاري تحويل صوتك إلى نص..."):
-
-            audio_bytes = prompt.audio.getvalue()
-
-            recognizer = sr.Recognizer()
-
-            audio_file = io.BytesIO(audio_bytes)
-
-            with sr.AudioFile(audio_file) as source:
-                audio_data = recognizer.record(source)
-
-            try:
-                prompt_text = recognizer.recognize_google(
-                    audio_data,
-                    language="ar-EG"
-                )
-
-            except sr.UnknownValueError:
-                st.error(
-                    "❌ مش قادر أفهم التسجيل. جرّب تتكلم أوضح."
-                )
-                st.stop()
-
-            except sr.RequestError as e:
-                st.error(
-                    f"❌ خدمة تحويل الصوت غير متاحة: {e}"
-                )
-                st.stop()
+        prompt_text = prompt.text or ""
 
 
-    if not prompt_text and not uploaded_file:
-        st.warning(
-            "اكتب رسالة أو سجل صوت أو ارفع ملف."
+        # =====================================================
+        # الملف
+        # =====================================================
+
+        uploaded_file = (
+
+            prompt.files[0]
+
+            if prompt.files
+
+            else None
+
         )
-        st.stop()
 
 
-    # عرض رسالة المستخدم
-    with st.chat_message("user"):
-
-        if prompt_text:
-            st.markdown(prompt_text)
+        # =====================================================
+        # تحويل الصوت إلى نص
+        # =====================================================
 
         if prompt.audio:
-            st.caption(
-                "🎙️ تم تحويل الرسالة الصوتية إلى نص."
+
+            with st.spinner(
+                "🎙️ جاري تحويل صوتك إلى نص..."
+            ):
+
+                audio_bytes = (
+                    prompt.audio.getvalue()
+                )
+
+                recognizer = sr.Recognizer()
+
+                audio_file = io.BytesIO(
+                    audio_bytes
+                )
+
+                try:
+
+                    with sr.AudioFile(
+                        audio_file
+                    ) as source:
+
+                        audio_data = (
+                            recognizer.record(source)
+                        )
+
+
+                    prompt_text = (
+                        recognizer.recognize_google(
+                            audio_data,
+                            language="ar-EG"
+                        )
+                    )
+
+
+                except sr.UnknownValueError:
+
+                    st.error(
+                        "❌ مش قادر أفهم التسجيل. "
+                        "جرّب تتكلم أوضح."
+                    )
+
+                    st.stop()
+
+
+                except sr.RequestError as e:
+
+                    st.error(
+                        "❌ خدمة تحويل الصوت إلى نص "
+                        f"غير متاحة حاليًا: {e}"
+                    )
+
+                    st.stop()
+
+
+                except Exception as e:
+
+                    st.error(
+                        f"❌ حصل خطأ في قراءة التسجيل: {e}"
+                    )
+
+                    st.stop()
+
+
+        # =====================================================
+        # التأكد من وجود رسالة
+        # =====================================================
+
+        if not prompt_text and not uploaded_file:
+
+            st.warning(
+                "اكتب رسالة أو سجل صوت أو ارفع ملف."
             )
+
+            st.stop()
+
+
+        # =====================================================
+        # عرض رسالة المستخدم
+        # =====================================================
+
+        with st.chat_message("user"):
+
+            if prompt_text:
+
+                st.markdown(prompt_text)
+
+
+            if prompt.audio:
+
+                st.caption(
+                    "🎙️ تم تحويل الرسالة الصوتية إلى نص."
+                )
+
+
+            if uploaded_file:
+
+                file_type = (
+                    uploaded_file.type or ""
+                )
+
+
+                if file_type.startswith("image/"):
+
+                    st.image(
+                        uploaded_file
+                    )
+
+                else:
+
+                    st.caption(
+                        f"📎 {uploaded_file.name}"
+                    )
+
+
+        # =====================================================
+        # محتوى الرسالة
+        # =====================================================
+
+        content = [
+
+            {
+                "type": "text",
+                "text": prompt_text
+            }
+
+        ]
+
+
+        # =====================================================
+        # إضافة الصورة
+        # =====================================================
 
         if uploaded_file:
 
-            file_type = uploaded_file.type or ""
+            file_type = (
+                uploaded_file.type or ""
+            )
+
 
             if file_type.startswith("image/"):
-                st.image(uploaded_file)
-            else:
-                st.caption(
-                    f"📎 {uploaded_file.name}"
+
+                image_bytes = (
+                    uploaded_file.getvalue()
                 )
 
 
-    # محتوى الرسالة
-    content = [
-        {
-            "type": "text",
-            "text": prompt_text
-        }
-    ]
+                image_base64 = (
+                    base64.b64encode(
+                        image_bytes
+                    ).decode("utf-8")
+                )
 
 
-    # الصورة
-    if uploaded_file:
+                content.append({
 
-        file_type = uploaded_file.type or ""
-
-        if file_type.startswith("image/"):
-
-            image_bytes = uploaded_file.getvalue()
-
-            image_base64 = base64.b64encode(
-                image_bytes
-            ).decode("utf-8")
-
-            content.append(
-                {
                     "type": "image_url",
+
                     "image_url": {
+
                         "url": (
                             f"data:{file_type};"
                             f"base64,{image_base64}"
                         )
+
                     }
-                }
+
+                })
+
+
+        # =====================================================
+        # البحث التلقائي - مخفي عن المستخدم
+        # =====================================================
+
+        search_results = []
+
+
+        if prompt_text and needs_web_search(
+            prompt_text
+        ):
+
+            search_results = search_web(
+                prompt_text
             )
 
 
-    # البحث
-    search_results = []
+        # =====================================================
+        # إرسال نتائج البحث للذكاء الاصطناعي
+        # =====================================================
 
-    if web_enabled and prompt_text:
+        if search_results:
 
-        if needs_web_search(prompt_text):
+            search_text = (
+                "\n\n"
+                "معلومات تم العثور عليها "
+                "من البحث على الإنترنت:\n\n"
+            )
 
-            with st.spinner("🔎 جاري البحث..."):
-                search_results = search_web(
-                    prompt_text
+
+            for i, result in enumerate(
+                search_results,
+                start=1
+            ):
+
+                title = result.get(
+                    "title",
+                    ""
+                )
+
+                url = result.get(
+                    "href",
+                    ""
                 )
 
 
-    # إضافة نتائج البحث للذكاء الاصطناعي
-    if search_results:
+                search_text += (
 
-        search_text = (
-            "معلومات حديثة من البحث على الإنترنت:\n\n"
+                    f"{i}. {title}\n"
+                    f"الرابط: {url}\n\n"
+
+                )
+
+
+            content.append({
+
+                "type": "text",
+
+                "text": search_text
+
+            })
+
+
+        # =====================================================
+        # تاريخ المحادثة
+        # =====================================================
+
+        api_messages = [
+
+            {
+                "role": "system",
+                "content": system_prompt
+            }
+
+        ]
+
+
+        for message in st.session_state.messages:
+
+            api_messages.append({
+
+                "role": message["role"],
+
+                "content": message["content"]
+
+            })
+
+
+        api_messages.append({
+
+            "role": "user",
+
+            "content": content
+
+        })
+
+
+        # =====================================================
+        # إرسال إلى Yosef AI
+        # =====================================================
+
+        response = (
+            client.chat.completions.create(
+
+                model="openrouter/free",
+
+                messages=api_messages,
+
+                max_tokens=800
+
+            )
         )
 
-        for result in search_results:
 
-            title = result.get("title", "")
-            body = result.get("body", "")
-            url = result.get("href", "")
+        answer = (
 
-           
+            response.choices[0]
+            .message.content
+
+            or "لم أتمكن من إنشاء رد."
+
+        )
+
+
+        # =====================================================
+        # عرض رد Yosef AI
+        # =====================================================
+
+        with st.chat_message("assistant"):
+
+            st.markdown(answer)
+
+
+            # =================================================
+            # تشغيل الصوت تلقائياً
+            # =================================================
+
+            safe_answer = json.dumps(
+                answer,
+                ensure_ascii=False
+            )
+
+
+            components.html(
+
+                f"""
+
+                <script>
+
+                const text = {safe_answer};
+
+                function speakYosef() {{
+
+                    try {{
+
+                        window.speechSynthesis.cancel();
+
+                        const speech =
+                            new SpeechSynthesisUtterance(
+                                text
+                            );
+
+                        speech.lang = "ar-SA";
+
+                        speech.rate = 1.0;
+
+                        speech.pitch = 1.0;
+
+                        window.speechSynthesis.speak(
+                            speech
+                        );
+
+                    }} catch (error) {{
+
+                        console.log(error);
+
+                    }}
+
+                }}
+
+                window.addEventListener(
+                    "load",
+                    function() {{
+
+                        setTimeout(
+                            speakYosef,
+                            500
+                        );
+
+                    }}
+                );
+
+                </script>
+
+                """,
+
+                height=1
+            )
+
+
+        # =====================================================
+        # حفظ المحادثة
+        # =====================================================
+
+        st.session_state.messages.append({
+
+            "role": "user",
+
+            "content": prompt_text
+
+        })
+
+
+        st.session_state.messages.append({
+
+            "role": "assistant",
+
+            "content": answer
+
+        })
+
+
+    except Exception as e:
+
+        st.error(
+            f"حدث خطأ: {e}"
+                )

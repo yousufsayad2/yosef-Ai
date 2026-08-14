@@ -24,7 +24,7 @@ if api_key:
 system_prompt = """أنت Yosef AI، مساعد ذكي داخل تطبيق اسمه Yosef AI.
 عندما يسألك المستخدم عن اسمك، قل إن اسمك Yosef AI.
 لا تقل إنك ChatGPT أو المساعد الرسمي لـ OpenAI."""
-    for message in st.session_state.messages:
+        for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
 if st.button("🆕 محادثة جديدة"):

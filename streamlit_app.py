@@ -54,13 +54,32 @@ if prompt:
         st.markdown(prompt)
 
     try:
-        response = client.chat.completions.create(
-            model="openrouter/free",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                *st.session_state.messages
-            ]
-        )
+    content = [{"type": "text", "text": prompt}]
+
+    image_file = uploaded_file if uploaded_file and uploaded_file.type.startswith("image/") else camera_image
+
+    if image_file:
+        image_bytes = image_file.getvalue()
+        image_base64 = base64.b64encode(image_bytes).decode("utf-8")
+        image_type = image_file.type
+
+        content.append({
+            "type": "image_url",
+            "image_url": {
+                "url": f"data:{image_type};base64,{image_base64}"
+            }
+        })
+
+    api_messages = [
+        {"role": "system", "content": system_prompt},
+        *st.session_state.messages[:-1],
+        {"role": "user", "content": content}
+    ]
+
+    response = client.chat.completions.create(
+        model="openrouter/free",
+        messages=api_messages
+    )
 
         answer = response.choices[0].message.content
 

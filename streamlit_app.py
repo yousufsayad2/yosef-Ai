@@ -84,7 +84,7 @@ if st.button("🆕 محادثة جديدة"):
 
 
 # =========================
-# إعدادات الصوت والبحث
+# إعدادات
 # =========================
 
 voice_enabled = st.checkbox(
@@ -105,7 +105,6 @@ web_enabled = st.checkbox(
 def needs_web_search(text):
 
     keywords = [
-
         "الطقس",
         "الجو",
         "درجة الحرارة",
@@ -150,12 +149,10 @@ def needs_web_search(text):
 
     text_lower = text.lower()
 
-    for keyword in keywords:
-
-        if keyword in text_lower:
-            return True
-
-    return False
+    return any(
+        keyword in text_lower
+        for keyword in keywords
+    )
 
 
 # =========================
@@ -185,7 +182,7 @@ def search_web(query):
 
 
 # =========================
-# خانة الإدخال
+# الإدخال
 # =========================
 
 prompt = st.chat_input(
@@ -212,16 +209,7 @@ if prompt:
 
     try:
 
-        # =========================
-        # النص
-        # =========================
-
         prompt_text = prompt.text or ""
-
-
-        # =========================
-        # الملف
-        # =========================
 
         uploaded_file = (
             prompt.files[0]
@@ -311,9 +299,7 @@ if prompt:
 
             if uploaded_file:
 
-                file_type = (
-                    uploaded_file.type or ""
-                )
+                file_type = uploaded_file.type or ""
 
                 if file_type.startswith("image/"):
 
@@ -331,12 +317,10 @@ if prompt:
         # =========================
 
         content = [
-
             {
                 "type": "text",
                 "text": prompt_text
             }
-
         ]
 
 
@@ -346,62 +330,43 @@ if prompt:
 
         if uploaded_file:
 
-            file_type = (
-                uploaded_file.type or ""
-            )
+            file_type = uploaded_file.type or ""
 
             if file_type.startswith("image/"):
 
-                image_bytes = (
-                    uploaded_file.getvalue()
-                )
+                image_bytes = uploaded_file.getvalue()
 
                 image_base64 = base64.b64encode(
                     image_bytes
                 ).decode("utf-8")
 
-                content.append(
-
-                    {
-                        "type": "image_url",
-
-                        "image_url": {
-
-                            "url": (
-                                f"data:{file_type};"
-                                f"base64,{image_base64}"
-                            )
-
-                        }
-
+                content.append({
+                    "type": "image_url",
+                    "image_url": {
+                        "url": (
+                            f"data:{file_type};"
+                            f"base64,{image_base64}"
+                        )
                     }
-
-                )
+                })
 
 
         # =========================
-        # البحث
+        # البحث في الخلفية
         # =========================
 
         search_results = []
 
         should_search = (
-
             web_enabled
-
             and prompt_text
-
-            and needs_web_search(
-                prompt_text
-            )
-
+            and needs_web_search(prompt_text)
         )
-
 
         if should_search:
 
             with st.spinner(
-                "🌐 جاري البحث على الإنترنت..."
+                "🌐 جاري البحث..."
             ):
 
                 search_results = search_web(
@@ -410,7 +375,8 @@ if prompt:
 
 
         # =========================
-        # إضافة نتائج البحث للـ AI
+        # إرسال نتائج البحث للذكاء الاصطناعي
+        # بدون عرضها للمستخدم
         # =========================
 
         if search_results:
@@ -419,7 +385,6 @@ if prompt:
                 "\n\n"
                 "نتائج البحث على الإنترنت:\n\n"
             )
-
 
             for i, result in enumerate(
                 search_results,
@@ -442,56 +407,15 @@ if prompt:
                 )
 
                 search_text += (
-
                     f"{i}. {title}\n"
                     f"الرابط: {url}\n"
                     f"المحتوى: {body}\n\n"
-
                 )
 
-
-            content.append(
-
-                {
-                    "type": "text",
-                    "text": search_text
-                }
-
-            )
-
-
-            # =========================
-            # عرض المصادر
-            # =========================
-
-            with st.expander(
-                "🌐 مصادر البحث"
-            ):
-
-                for result in search_results:
-
-                    title = result.get(
-                        "title",
-                        "مصدر"
-                    )
-
-                    url = result.get(
-                        "href",
-                        ""
-                    )
-
-                    if url:
-
-                        st.markdown(
-                            f"- [{title}]({url})"
-                        )
-
-
-        elif should_search:
-
-            st.info(
-                "🌐 لم أتمكن من العثور على نتائج بحث."
-            )
+            content.append({
+                "type": "text",
+                "text": search_text
+            })
 
 
         # =========================
@@ -499,59 +423,39 @@ if prompt:
         # =========================
 
         api_messages = [
-
             {
                 "role": "system",
                 "content": system_prompt
             }
-
         ]
-
 
         for message in st.session_state.messages:
 
-            api_messages.append(
+            api_messages.append({
+                "role": message["role"],
+                "content": message["content"]
+            })
 
-                {
-                    "role": message["role"],
-                    "content": message["content"]
-                }
-
-            )
-
-
-        api_messages.append(
-
-            {
-                "role": "user",
-                "content": content
-            }
-
-        )
+        api_messages.append({
+            "role": "user",
+            "content": content
+        })
 
 
         # =========================
-        # إرسال إلى Yosef AI
+        # Yosef AI
         # =========================
 
         response = client.chat.completions.create(
-
             model="openrouter/free",
-
             messages=api_messages,
-
             max_tokens=800
-
         )
 
-
         answer = (
-
             response.choices[0]
             .message.content
-
             or "لم أتمكن من إنشاء رد."
-
         )
 
 
@@ -565,7 +469,7 @@ if prompt:
 
 
             # =========================
-            # تشغيل الصوت
+            # تشغيل صوت الرد
             # =========================
 
             if voice_enabled:
@@ -575,11 +479,9 @@ if prompt:
                     ensure_ascii=False
                 )
 
-
                 components.html(
 
                     f"""
-
                     <div style="
                         text-align:center;
                         padding:5px;
@@ -599,7 +501,6 @@ if prompt:
                         </button>
 
                     </div>
-
 
                     <script>
 
@@ -623,15 +524,12 @@ if prompt:
                         window.speechSynthesis.speak(
                             speech
                         );
-
                     }}
 
                     </script>
-
                     """,
 
                     height=60
-
                 )
 
 
@@ -639,28 +537,19 @@ if prompt:
         # حفظ المحادثة
         # =========================
 
-        st.session_state.messages.append(
+        st.session_state.messages.append({
+            "role": "user",
+            "content": prompt_text
+        })
 
-            {
-                "role": "user",
-                "content": prompt_text
-            }
-
-        )
-
-
-        st.session_state.messages.append(
-
-            {
-                "role": "assistant",
-                "content": answer
-            }
-
-        )
+        st.session_state.messages.append({
+            "role": "assistant",
+            "content": answer
+        })
 
 
     except Exception as e:
 
         st.error(
             f"حدث خطأ: {e}"
-                )
+        )

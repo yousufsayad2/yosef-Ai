@@ -48,19 +48,18 @@ if prompt:
       
             
             response = client.chat.completions.create(
-                model="openrouter/free",
-                messages=api_messages
-            )
+        model="openrouter/free",
+        messages=api_messages
+    )
 
-            answer = response.choices[0].message.content
+    answer = response.choices[0].message.content
 
-            st.session_state.messages.append({
-                "role": "assistant",
-                "content": answer
-            })
+    st.session_state.messages.append({
+        "role": "assistant",
+        "content": answer
+    })
 
-            with st.chat_message("assistant"):
-                st.markdown(answer)
-
+    with st.chat_message("assistant"):
+        st.markdown(answer)    
         except Exception as e:
             st.error(f"حدث خطأ: {e}")

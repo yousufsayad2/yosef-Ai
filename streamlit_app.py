@@ -780,46 +780,97 @@ prompt = st.chat_input(
         "txt",
         "pdf",
         "docx"
-    ]
-)
+        content = [
+            {
+                "type": "text",
+                "text": prompt_text
+            }
+        ]
 
-if prompt:
-    try:
+        if uploaded_file:
+            file_type = uploaded_file.type or ""
 
-        # تحويل الصوت إلى نص
-        prompt_text = prompt.text or ""
+            if file_type.startswith("image/"):
+                image_bytes = uploaded_file.getvalue()
 
-        if prompt.audio:
-            audio_bytes = prompt.audio.getvalue()
-            audio_base64 = base64.b64encode(
-                audio_bytes
-            ).decode("utf-8")
+                image_base64 = base64.b64encode(
+                    image_bytes
+                ).decode("utf-8")
 
-            transcription_response = requests.post(
-                "https://openrouter.ai/api/v1/audio/transcriptions",
-                headers={
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": "openai/whisper-large-v3",
-                    "input_audio": {
-                        "data": audio_base64,
-                        "format": "wav"
+                content.append({
+                    "type": "image_url",
+                    "image_url": {
+                        "url": (
+                            f"data:{file_type};"
+                            f"base64,{image_base64}"
+                        )
                     }
-                },
-                timeout=120
-            )
+                })
 
-            transcription_response.raise_for_status()
+        api_messages = [
+            {
+                "role": "system",
+                "content": system_prompt
+            }
+        ]
 
-            transcription_data = (
-                transcription_response.json()
-            )
+        for message in st.session_state.messages:
+            api_messages.append({
+                "role": message["role"],
+                "content": message["content"]
+            })
 
-            prompt_text = transcription_data.get(
-                "text",
-                ""
-            ).strip()
+        api_messages.append({
+            "role": "user",
+            "content": content
+        })
 
-        # الملف المرفوع
+        response = client.chat.completions.create(
+            model="openrouter/free",
+            messages=api_messages,
+            max_tokens=800
+        )
+
+        answer = (
+            response.choices[0].message.content
+            or "لم أتمكن من إنشاء رد."
+        )
+
+        with st.chat_message("assistant"):
+            st.markdown(answer)
+
+            if voice_enabled:
+                speech_response = requests.post(
+                    "https://openrouter.ai/api/v1/audio/speech",
+                    headers={
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json"
+                    },
+                    json={
+                        "model": "openai/gpt-4o-mini-tts-2025-12-15",
+                        "input": answer,
+                        "voice": "alloy",
+                        "response_format": "mp3"
+                    },
+                    timeout=120
+                )
+
+                speech_response.raise_for_status()
+
+                st.audio(
+                    speech_response.content,
+                    format="audio/mpeg"
+                )
+
+        st.session_state.messages.append({
+            "role": "user",
+            "content": prompt_text
+        })
+
+        st.session_state.messages.append({
+            "role": "assistant",
+            "content": answer
+        })
+
+    except Exception as e:
+        st.error(f"حدث خطأ: {e}")

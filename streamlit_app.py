@@ -1,8 +1,13 @@
 import streamlit as st
 from openai import OpenAI
+import base64
 import io
 import speech_recognition as sr
 
+
+# =========================================================
+# إعداد الصفحة
+# =========================================================
 
 st.set_page_config(
     page_title="Yosef AI",
@@ -11,9 +16,9 @@ st.set_page_config(
 )
 
 
-# =========================
+# =========================================================
 # OpenRouter
-# =========================
+# =========================================================
 
 api_key = st.secrets["OPENROUTER_API_KEY"]
 
@@ -23,9 +28,9 @@ client = OpenAI(
 )
 
 
-# =========================
+# =========================================================
 # الذاكرة
-# =========================
+# =========================================================
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -34,9 +39,9 @@ if "voice_call" not in st.session_state:
     st.session_state.voice_call = False
 
 
-# =========================
+# =========================================================
 # تعليمات Yosef AI
-# =========================
+# =========================================================
 
 system_prompt = """
 أنت Yosef AI.
@@ -47,19 +52,27 @@ system_prompt = """
 
 أجب باللغة التي يستخدمها المستخدم.
 
-كن طبيعيًا وودودًا.
+كن طبيعيًا وودودًا ومفيدًا.
 
 في المحادثة الصوتية:
 - تكلم بطريقة طبيعية.
-- اجعل الرد قصيرًا وواضحًا.
+- اجعل الرد واضحًا ومختصرًا.
 - لا تستخدم مقدمات طويلة.
-- تعامل مع المستخدم كأنه يتحدث مع مساعد صوتي حقيقي.
+- تعامل مع المستخدم كأنه يتحدث مع مساعد صوتي.
+
+إذا أرسل المستخدم صورة:
+- حلل الصورة وساعده فيها.
+- لا تخترع أشياء غير واضحة في الصورة.
+
+إذا أرسل المستخدم ملفًا:
+- استخدم المعلومات المتاحة منه.
+- إذا لم تستطع قراءة محتوى الملف، وضح ذلك.
 """
 
 
-# =========================
+# =========================================================
 # العنوان
-# =========================
+# =========================================================
 
 st.title("🤖 Yosef AI")
 
@@ -67,13 +80,14 @@ st.write("أهلاً بيك 👋")
 st.write("أنا Yosef AI، مساعدك الذكي. اسألني أي حاجة!")
 
 
-# =========================
+# =========================================================
 # محادثة جديدة
-# =========================
+# =========================================================
 
 if st.button(
     "🆕 محادثة جديدة",
-    use_container_width=True
+    use_container_width=True,
+    key="new_chat"
 ):
 
     st.session_state.messages = []
@@ -82,9 +96,9 @@ if st.button(
     st.rerun()
 
 
-# =========================
-# عرض المحادثة القديمة
-# =========================
+# =========================================================
+# عرض المحادثة
+# =========================================================
 
 for message in st.session_state.messages:
 
@@ -95,21 +109,34 @@ for message in st.session_state.messages:
         )
 
 
-# =========================
+# =========================================================
 # طلب الرد من Yosef
-# =========================
+# =========================================================
 
-def ask_yosef(text):
+def ask_yosef(text, extra_content=None):
 
-    api_messages = []
+    content = [
+        {
+            "type": "text",
+            "text": text
+        }
+    ]
 
-    api_messages.append(
+    # إضافة صورة أو محتوى إضافي
+    if extra_content:
+
+        content.extend(
+            extra_content
+        )
+
+    api_messages = [
         {
             "role": "system",
             "content": system_prompt
         }
-    )
+    ]
 
+    # تاريخ المحادثة
     for message in st.session_state.messages:
 
         api_messages.append(
@@ -119,10 +146,11 @@ def ask_yosef(text):
             }
         )
 
+    # الرسالة الحالية
     api_messages.append(
         {
             "role": "user",
-            "content": text
+            "content": content
         }
     )
 
@@ -134,9 +162,13 @@ def ask_yosef(text):
             max_tokens=800
         )
 
-        answer = response.choices[0].message.content
+        answer = (
+            response.choices[0]
+            .message.content
+        )
 
         if not answer:
+
             return "لم أتمكن من إنشاء رد."
 
         return answer
@@ -167,261 +199,12 @@ def ask_yosef(text):
         return None
 
 
-# =========================
+# =========================================================
 # تحويل النص إلى صوت
-# =========================
+# =========================================================
 
 def speak_text(text):
 
     safe_text = str(text)
 
-    safe_text = safe_text.replace(
-        "\\",
-        "\\\\"
-    )
-
-    safe_text = safe_text.replace(
-        "`",
-        "\\`"
-    )
-
-    safe_text = safe_text.replace(
-        "${",
-        "\\${"
-    )
-
-    safe_text = safe_text.replace(
-        "\n",
-        " "
-    )
-
-    safe_text = safe_text.replace(
-        "\r",
-        " "
-    )
-
-    html = (
-        "<script>"
-        "const text = `"
-        + safe_text
-        + "`;"
-        "if ('speechSynthesis' in window) {"
-        "window.speechSynthesis.cancel();"
-        "const speech = new SpeechSynthesisUtterance(text);"
-        "speech.lang = 'ar-SA';"
-        "speech.rate = 1.0;"
-        "speech.pitch = 1.0;"
-        "window.speechSynthesis.speak(speech);"
-        "}"
-        "</script>"
-    )
-
-    st.components.v1.html(
-        html,
-        height=1
-    )
-
-
-# =========================
-# زر المحادثة الصوتية
-# =========================
-
-if not st.session_state.voice_call:
-
-    if st.button(
-        "📞 محادثة صوتية",
-        use_container_width=True
-    ):
-
-        st.session_state.voice_call = True
-
-        st.rerun()
-
-else:
-
-    st.success(
-        "📞 المحادثة الصوتية مفعّلة"
-    )
-
-    if st.button(
-        "🔴 إنهاء المحادثة الصوتية",
-        use_container_width=True
-    ):
-
-        st.session_state.voice_call = False
-
-        st.rerun()
-
-
-# =========================
-# المحادثة الصوتية
-# =========================
-
-if st.session_state.voice_call:
-
-    st.subheader(
-        "🎙️ اتكلم مع Yosef AI"
-    )
-
-    st.caption(
-        "اضغط على الميكروفون واتكلم."
-    )
-
-    voice_audio = st.audio_input(
-        "🎙️ اضغط هنا للتحدث"
-    )
-
-    if voice_audio:
-
-        try:
-
-            audio_bytes = voice_audio.getvalue()
-
-            audio_buffer = io.BytesIO(
-                audio_bytes
-            )
-
-            recognizer = sr.Recognizer()
-
-            with sr.AudioFile(
-                audio_buffer
-            ) as source:
-
-                audio_data = recognizer.record(
-                    source
-                )
-
-            with st.spinner(
-                "🎧 Yosef AI بيسمعك..."
-            ):
-
-                spoken_text = (
-                    recognizer.recognize_google(
-                        audio_data,
-                        language="ar-EG"
-                    )
-                )
-
-            with st.chat_message("user"):
-
-                st.markdown(
-                    spoken_text
-                )
-
-            with st.spinner(
-                "🤖 Yosef AI بيفكر..."
-            ):
-
-                answer = ask_yosef(
-                    spoken_text
-                )
-
-            if answer:
-
-                with st.chat_message("assistant"):
-
-                    st.markdown(
-                        answer
-                    )
-
-                    speak_text(
-                        answer
-                    )
-
-                st.session_state.messages.append(
-                    {
-                        "role": "user",
-                        "content": spoken_text
-                    }
-                )
-
-                st.session_state.messages.append(
-                    {
-                        "role": "assistant",
-                        "content": answer
-                    }
-                )
-
-                st.rerun()
-
-        except sr.UnknownValueError:
-
-            st.error(
-                "❌ مش قادر أفهم التسجيل."
-            )
-
-        except sr.RequestError:
-
-            st.error(
-                "❌ خدمة تحويل الصوت إلى نص غير متاحة."
-            )
-
-        except Exception as error:
-
-            st.error(
-                "❌ حصل خطأ في المحادثة الصوتية: "
-                + str(error)
-            )
-
-
-# =========================
-# الشات العادي
-# =========================
-
-prompt = st.chat_input(
-    "اكتب رسالتك..."
-)
-
-
-# =========================
-# معالجة الرسالة
-# =========================
-
-if prompt:
-
-    try:
-
-        prompt_text = str(prompt)
-
-        with st.chat_message("user"):
-
-            st.markdown(
-                prompt_text
-            )
-
-        with st.spinner(
-            "🤖 Yosef AI بيفكر..."
-        ):
-
-            answer = ask_yosef(
-                prompt_text
-            )
-
-        if answer:
-
-            with st.chat_message("assistant"):
-
-                st.markdown(
-                    answer
-                )
-
-            st.session_state.messages.append(
-                {
-                    "role": "user",
-                    "content": prompt_text
-                }
-            )
-
-            st.session_state.messages.append(
-                {
-                    "role": "assistant",
-                    "content": answer
-                }
-            )
-
-    except Exception as error:
-
-        st.error(
-            "❌ حصل خطأ: "
-            + str(error)
-        )
+   

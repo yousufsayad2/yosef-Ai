@@ -1,7 +1,6 @@
 import streamlit as st
 from openai import OpenAI
 import base64
-import re
 import requests
 import io
 import speech_recognition as sr
@@ -25,7 +24,6 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-
     .yosef-title {
         text-align: center;
         font-size: 34px;
@@ -40,7 +38,6 @@ st.markdown(
         margin-bottom: 25px;
         font-size: 16px;
     }
-
     </style>
     """,
     unsafe_allow_html=True
@@ -77,7 +74,7 @@ if "voice_call" not in st.session_state:
 system_prompt = """
 أنت Yosef AI، مساعد ذكي داخل تطبيق اسمه Yosef AI.
 
-عندما يسألك المستخدم عن اسمك، قل إن اسمك Yosef AI.
+اسمك Yosef AI.
 
 لا تقل إنك ChatGPT أو المساعد الرسمي لـ OpenAI.
 
@@ -89,41 +86,10 @@ system_prompt = """
 - تحدث بطريقة طبيعية.
 - اجعل الرد واضحًا ومختصرًا.
 - تعامل مع المستخدم كأنه يتحدث مع مساعد صوتي.
-- لا تبدأ كل رد بمقدمات طويلة.
+- لا تستخدم مقدمات طويلة.
 
-إذا تم إعطاؤك معلومات من البحث على الإنترنت:
-- استخدم المعلومات المتاحة.
-- لا تخترع معلومات غير موجودة.
-- إذا كانت المعلومات غير كافية، وضح ذلك.
-- لا تذكر تفاصيل البحث الداخلية للمستخدم إلا إذا طلبها.
+لا تخترع معلومات.
 """
-
-
-# =========================================================
-# دالة أخطاء الذكاء الاصطناعي
-# =========================================================
-
-def show_ai_error(error):
-
-    error_text = str(error)
-
-    if (
-        "429" in error_text
-        or "free-models-per-day" in error_text
-        or "Rate limit exceeded" in error_text
-    ):
-
-        st.warning(
-            "⏳ وصلنا للحد المجاني للطلبات اليوم.\n\n"
-            "جرّب استخدام Yosef AI بعد تجدد الحد."
-        )
-
-    else:
-
-        st.error(
-            "❌ حصل خطأ أثناء تشغيل Yosef AI.\n\n"
-            "جرّب مرة أخرى بعد قليل."
-        )
 
 
 # =========================================================
@@ -138,74 +104,4 @@ st.markdown(
 st.markdown(
     '<div class="yosef-subtitle">'
     'أهلاً بيك 👋<br>'
-    'أنا Yosef AI، مساعدك الذكي. اسألني أي حاجة!'
-    '</div>',
-    unsafe_allow_html=True
-)
-
-
-# =========================================================
-# محادثة جديدة
-# =========================================================
-
-if st.button(
-    "🆕 محادثة جديدة",
-    use_container_width=True,
-    key="new_chat_button"
-):
-
-    st.session_state.messages = []
-    st.session_state.voice_call = False
-
-    st.rerun()
-
-
-# =========================================================
-# عرض المحادثة
-# =========================================================
-
-for message in st.session_state.messages:
-
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
-
-
-# =========================================================
-# تحديد الأسئلة التي تحتاج بحث
-# =========================================================
-
-def needs_web_search(text):
-
-    keywords = [
-        "الطقس",
-        "الجو",
-        "درجة الحرارة",
-        "مطر",
-        "رياح",
-
-        "أخبار",
-        "خبر",
-        "الأخبار",
-        "آخر الأخبار",
-        "اخر الاخبار",
-
-        "سعر",
-        "الأسعار",
-        "بكام",
-        "سعر الدولار",
-        "سعر الذهب",
-
-        "اليوم",
-        "دلوقتي",
-        "الآن",
-        "حاليا",
-        "حاليًا",
-
-        "أحدث",
-        "آخر",
-        "الجديد",
-
-        "موعد",
-        "متى",
-        "نتيجة",
-        "نت
+    '

@@ -45,7 +45,7 @@ if prompt:
 
     try:
         response = client.chat.completions.create(
-            model="openai/gpt-oss-20b:free",
+            model="openrouter/free",
             messages=[
                 {"role": "system", "content": system_prompt},
                 *st.session_state.messages

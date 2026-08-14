@@ -1,8 +1,10 @@
 import streamlit as st
 from openai import OpenAI
 import base64
-import json
+import io
+import speech_recognition as sr
 import streamlit.components.v1 as components
+import json
 
 st.set_page_config(
     page_title="Yosef AI",
@@ -27,11 +29,10 @@ system_prompt = """أنت Yosef AI، مساعد ذكي داخل تطبيق اس�
 عندما يسألك المستخدم عن اسمك، قل إن اسمك Yosef AI.
 لا تقل إنك ChatGPT أو المساعد الرسمي لـ OpenAI.
 أجب باللغة التي يستخدمها المستخدم.
-إذا أرسل المستخدم صوتًا، افهم كلامه وأجب عنه مباشرة.
 """
 
 # =========================
-# عرض المحادثة السابقة
+# عرض المحادثة
 # =========================
 
 for message in st.session_state.messages:
@@ -49,7 +50,7 @@ if st.button("🆕 محادثة جديدة"):
 
 
 # =========================
-# تشغيل الصوت
+# الصوت
 # =========================
 
 voice_enabled = st.checkbox(
@@ -59,7 +60,7 @@ voice_enabled = st.checkbox(
 
 
 # =========================
-# الكتابة + الصور + الملفات + الصوت
+# الإدخال
 # =========================
 
 prompt = st.chat_input(
@@ -92,17 +93,63 @@ if prompt:
 
 
         # =========================
-        # لازم يكون فيه رسالة
+        # تحويل الصوت إلى نص
         # =========================
 
-        if (
-            not prompt_text
-            and not prompt.audio
-            and not uploaded_file
-        ):
+        if prompt.audio:
+
+            with st.spinner("🎙️ جاري تحويل صوتك إلى نص..."):
+
+                audio_bytes = prompt.audio.getvalue()
+
+                recognizer = sr.Recognizer()
+
+                audio_file = io.BytesIO(
+                    audio_bytes
+                )
+
+                with sr.AudioFile(audio_file) as source:
+
+                    audio_data = recognizer.record(
+                        source
+                    )
+
+                try:
+
+                    prompt_text = recognizer.recognize_google(
+                        audio_data,
+                        language="ar-EG"
+                    )
+
+                except sr.UnknownValueError:
+
+                    st.error(
+                        "❌ مش قادر أفهم الكلام في التسجيل. "
+                        "جرّب تتكلم أوضح."
+                    )
+
+                    st.stop()
+
+                except sr.RequestError as e:
+
+                    st.error(
+                        "❌ خدمة تحويل الصوت إلى نص "
+                        f"غير متاحة حاليًا: {e}"
+                    )
+
+                    st.stop()
+
+
+        # =========================
+        # التأكد من وجود رسالة
+        # =========================
+
+        if not prompt_text and not uploaded_file:
+
             st.warning(
                 "اكتب رسالة أو سجل صوت أو ارفع ملف."
             )
+
             st.stop()
 
 
@@ -117,7 +164,7 @@ if prompt:
 
             if prompt.audio:
                 st.caption(
-                    "🎙️ تم استلام الرسالة الصوتية."
+                    "🎙️ تم تحويل الرسالة الصوتية إلى نص."
                 )
 
             if uploaded_file:
@@ -127,8 +174,11 @@ if prompt:
                 )
 
                 if file_type.startswith("image/"):
+
                     st.image(uploaded_file)
+
                 else:
+
                     st.caption(
                         f"📎 {uploaded_file.name}"
                     )
@@ -138,42 +188,18 @@ if prompt:
         # تجهيز محتوى الرسالة
         # =========================
 
-        content = []
-
-
-        # النص
-        if prompt_text:
-
-            content.append({
+        content = [
+            {
                 "type": "text",
                 "text": prompt_text
-            })
+            }
+        ]
 
 
-        # الصوت
-        if prompt.audio:
+        # =========================
+        # إضافة الصورة
+        # =========================
 
-            audio_bytes = (
-                prompt.audio.getvalue()
-            )
-
-            audio_base64 = base64.b64encode(
-                audio_bytes
-            ).decode("utf-8")
-
-            content.append({
-
-                "type": "input_audio",
-
-                "input_audio": {
-                    "data": audio_base64,
-                    "format": "wav"
-                }
-
-            })
-
-
-        # الصورة
         if uploaded_file:
 
             file_type = (
@@ -219,7 +245,6 @@ if prompt:
 
         ]
 
-
         for message in st.session_state.messages:
 
             api_messages.append({
@@ -244,20 +269,11 @@ if prompt:
 
         response = client.chat.completions.create(
 
-            model=(
-                "nvidia/"
-                "nemotron-3-nano-omni-30b-a3b-reasoning:free"
-            ),
+            model="openrouter/free",
 
             messages=api_messages,
 
-            max_tokens=800,
-
-            extra_body={
-                "reasoning": {
-                    "effort": "none"
-                }
-            }
+            max_tokens=800
 
         )
 
@@ -273,7 +289,7 @@ if prompt:
 
 
         # =========================
-        # عرض رد Yosef AI
+        # عرض الرد
         # =========================
 
         with st.chat_message("assistant"):
@@ -282,7 +298,7 @@ if prompt:
 
 
             # =====================
-            # نطق الرد من المتصفح
+            # تشغيل صوت الرد
             # =====================
 
             if voice_enabled:
@@ -296,23 +312,22 @@ if prompt:
 
                     f"""
                     <div style="
-                        font-family: sans-serif;
-                        text-align: center;
-                        padding: 5px;
+                        text-align:center;
+                        padding:5px;
                     ">
 
-                        <button
-                            onclick="speakAnswer()"
-                            style="
-                                border: none;
-                                border-radius: 12px;
-                                padding: 10px 18px;
-                                font-size: 16px;
-                                cursor: pointer;
-                            "
-                        >
-                            🔊 تشغيل صوت Yosef AI
-                        </button>
+                    <button
+                        onclick="speakAnswer()"
+                        style="
+                            border:0;
+                            border-radius:12px;
+                            padding:10px 18px;
+                            font-size:16px;
+                            cursor:pointer;
+                        "
+                    >
+                    🔊 تشغيل صوت Yosef AI
+                    </button>
 
                     </div>
 
@@ -336,7 +351,6 @@ if prompt:
                         window.speechSynthesis.speak(
                             speech
                         );
-
                     }}
 
                     </script>
@@ -351,19 +365,11 @@ if prompt:
         # حفظ المحادثة
         # =========================
 
-        if prompt.audio:
-
-            user_history = "🎙️ رسالة صوتية"
-
-        else:
-
-            user_history = prompt_text
-
-
         st.session_state.messages.append({
 
             "role": "user",
-            "content": user_history
+
+            "content": prompt_text
 
         })
 
@@ -371,6 +377,7 @@ if prompt:
         st.session_state.messages.append({
 
             "role": "assistant",
+
             "content": answer
 
         })

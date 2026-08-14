@@ -36,8 +36,11 @@ with st.popover("➕"):
         type=["txt", "pdf", "png", "jpg", "jpeg"]
     )
 
-    camera_image = st.camera_input("📷 الكاميرا")
+    if st.button("📷 الكاميرا"):
+        st.session_state.show_camera = True
 
+    if st.session_state.get("show_camera", False):
+        camera_image = st.camera_input("📷 التقط صورة")
 prompt = st.chat_input("اكتب رسالتك...")
 if prompt:
     st.session_state.messages.append(

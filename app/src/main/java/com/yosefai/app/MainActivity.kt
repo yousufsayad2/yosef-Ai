@@ -2,18 +2,39 @@ package com.yosefai.app
 
 import android.app.Activity
 import android.os.Bundle
-import android.widget.TextView
+import android.webkit.WebView
+import android.webkit.WebViewClient
 
 class MainActivity : Activity() {
+
+    private lateinit var webView: WebView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val textView = TextView(this)
-        textView.text = "Yosef AI"
-        textView.textSize = 32f
-        textView.setPadding(40, 40, 40, 40)
+        webView = WebView(this)
 
-        setContentView(textView)
+        webView.settings.javaScriptEnabled = true
+        webView.settings.domStorageEnabled = true
+        webView.settings.databaseEnabled = true
+        webView.settings.loadsImagesAutomatically = true
+        webView.settings.allowFileAccess = true
+        webView.settings.allowContentAccess = true
+
+        webView.webViewClient = WebViewClient()
+
+        webView.loadUrl(
+            "https://yosef-ai-2pzqmuovs4ggxc5wyvz8ce.streamlit.app/"
+        )
+
+        setContentView(webView)
+    }
+
+    override fun onBackPressed() {
+        if (webView.canGoBack()) {
+            webView.goBack()
+        } else {
+            super.onBackPressed()
+        }
     }
 }

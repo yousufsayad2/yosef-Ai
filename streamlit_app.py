@@ -5,7 +5,6 @@ import io
 import requests
 import speech_recognition as sr
 import streamlit.components.v1 as components
-import html
 import json
 
 
@@ -29,16 +28,23 @@ openrouter_key = st.secrets.get("OPENROUTER_API_KEY")
 openai_key = st.secrets.get("OPENAI_API_KEY")
 
 
+# =========================================================
+# التأكد من مفتاح OpenRouter
+# =========================================================
+
 if not openrouter_key:
     st.error("❌ OPENROUTER_API_KEY غير موجود في Secrets.")
     st.stop()
 
 
-# OpenRouter للشات العادي
+# =========================================================
+# OpenRouter
+# =========================================================
+
 client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
     api_key=openrouter_key,
-    timeout=30.0,
+    timeout=60.0,
 )
 
 
@@ -46,9 +52,9 @@ client = OpenAI(
 # الموديل
 # =========================================================
 
-MODEL = "nvidia/nemotron-nano-12b-v2-vl:free"
+MODEL = "openrouter/free"
 
-# موديل المكالمة الصوتية الحقيقية
+# المكالمة الحقيقية تحتاج OPENAI_API_KEY
 REALTIME_MODEL = "gpt-realtime"
 
 
@@ -104,15 +110,6 @@ who is your developer
 لا تعرض التفكير الداخلي.
 
 لا تعرض خطوات التحليل.
-
-لا تقل:
-Here's a thinking process
-First, I need to check
-Analyze User Input
-Analysis
-تحليل المستخدم
-سأحلل
-أفكر خطوة بخطوة
 
 أرسل الإجابة النهائية فقط.
 
@@ -172,7 +169,7 @@ st.markdown(
 
     .welcome-box {
         text-align: center;
-        padding: 20px;
+        padding: 22px;
         margin: 10px 0 20px 0;
         border-radius: 22px;
         background: rgba(30, 33, 42, 0.75);
@@ -180,14 +177,15 @@ st.markdown(
     }
 
     .welcome-title {
-        font-size: 20px;
+        font-size: 21px;
         font-weight: 700;
     }
 
     .welcome-text {
         color: #8f96a3;
         font-size: 14px;
-        margin-top: 6px;
+        margin-top: 8px;
+        line-height: 1.8;
     }
 
     div[data-testid="stChatMessage"] {
@@ -301,35 +299,31 @@ def create_realtime_client_secret():
                     "model": REALTIME_MODEL,
                     "output_modalities": ["audio"],
                     "instructions": SYSTEM_PROMPT,
-                    "audio": {
-                        "output": {
-                            "voice": "marin"
-                        }
-                    },
                 }
             },
-            timeout=15,
+            timeout=20,
         )
 
-        if response.status_code != 200:
+        if response.status_code not in (200, 201):
 
             return None
 
         data = response.json()
 
-        # GA API يعيد value مباشرة
         token = data.get("value")
 
         if token:
             return token
 
-        # دعم شكل الاستجابة الآخر
         client_secret = data.get(
             "client_secret",
             {}
         )
 
-        return client_secret.get("value")
+        if isinstance(client_secret, dict):
+            return client_secret.get("value")
+
+        return None
 
     except Exception:
 
@@ -337,34 +331,35 @@ def create_realtime_client_secret():
 
 
 # =========================================================
-# واجهة المكالمة الصوتية الحقيقية
+# واجهة المكالمة الحقيقية
 # =========================================================
 
 def render_realtime_voice():
 
     if not openai_key:
 
-        st.warning(
-            "⚠️ لإجراء مكالمة صوتية حقيقية، أضف "
-            "OPENAI_API_KEY في Secrets."
+        st.info(
+            "🎙️ المكالمة الحقيقية تحتاج OPENAI_API_KEY. "
+            "الشات العادي شغال بمفتاح OpenRouter الموجود عندك."
         )
 
         return
+
 
     ephemeral_key = create_realtime_client_secret()
 
     if not ephemeral_key:
 
         st.error(
-            "❌ لم أستطع إنشاء جلسة المكالمة الصوتية."
+            "❌ تعذر إنشاء جلسة المكالمة."
         )
 
         st.caption(
-            "تأكد أن OPENAI_API_KEY صحيح وأن حساب OpenAI "
-            "مفعل لاستخدام Realtime API."
+            "تأكد من وجود مفتاح OpenAI صالح في Secrets."
         )
 
         return
+
 
     safe_key = json.dumps(ephemeral_key)
 
@@ -488,8 +483,8 @@ def render_realtime_voice():
             const EPHEMERAL_KEY = {safe_key};
 
             let pc = null;
-            let dc = null;
             let localStream = null;
+
 
             const startButton =
                 document.getElementById("start");
@@ -528,8 +523,12 @@ def render_realtime_voice():
 
                     pc.ontrack = function(event) {{
 
-                        remoteAudio.srcObject =
-                            event.streams[0];
+                        if (event.streams[0]) {{
+
+                            remoteAudio.srcObject =
+                                event.streams[0];
+
+                        }}
 
                     }};
 
@@ -588,66 +587,6 @@ def render_realtime_voice():
                         }});
 
 
-                    dc =
-                        pc.createDataChannel(
-                            "oai-events"
-                        );
-
-
-                    dc.onopen = function() {{
-
-                        const sessionUpdate = {{
-                            type: "session.update",
-                            session: {{
-                                type: "realtime",
-                                output_modalities: ["audio"],
-                                instructions:
-                                    "أنت Yosef AI. تحدث بالعربية إذا تحدث المستخدم بالعربية. كن طبيعيًا وودودًا ومختصرًا. لا تعرض التفكير الداخلي. تم تطوير Yosef AI بواسطة يوسف.",
-                                audio: {{
-                                    input: {{
-                                        turn_detection: {{
-                                            type: "server_vad"
-                                        }}
-                                    }},
-                                    output: {{
-                                        voice: "marin"
-                                    }}
-                                }}
-                            }}
-                        }};
-
-                        dc.send(
-                            JSON.stringify(
-                                sessionUpdate
-                            )
-                        );
-
-                    }};
-
-
-                    dc.onmessage = function(event) {{
-
-                        try {{
-
-                            const data =
-                                JSON.parse(event.data);
-
-                            if (
-                                data.type ===
-                                "response.audio_transcript.done"
-                            ) {{
-
-                                setStatus(
-                                    "🟢 المكالمة شغالة — Yosef AI رد"
-                                );
-
-                            }}
-
-                        }} catch (e) {{}}
-
-                    }};
-
-
                     const offer =
                         await pc.createOffer();
 
@@ -661,6 +600,7 @@ def render_realtime_voice():
                             "https://api.openai.com/v1/realtime/calls",
                             {{
                                 method: "POST",
+
                                 headers: {{
                                     "Authorization":
                                         "Bearer " +
@@ -711,6 +651,7 @@ def render_realtime_voice():
                         "🟢 المكالمة شغالة — اتكلم"
                     );
 
+
                 }} catch (error) {{
 
                     console.error(error);
@@ -758,15 +699,6 @@ def render_realtime_voice():
                 }}
 
 
-                if (dc) {{
-
-                    try {{
-                        dc.close();
-                    }} catch (e) {{}}
-
-                }}
-
-
                 if (pc) {{
 
                     try {{
@@ -777,7 +709,6 @@ def render_realtime_voice():
 
 
                 pc = null;
-                dc = null;
                 localStream = null;
 
 
@@ -875,7 +806,6 @@ if st.session_state.voice_mode:
             <div class="voice-title">
                 🎙️ مكالمة Yosef AI الحقيقية
             </div>
-
             <div class="voice-text">
                 اتكلم مع Yosef AI بصوتك بشكل مباشر.
             </div>
@@ -899,9 +829,9 @@ if not st.session_state.messages:
             <div class="welcome-title">
                 👋 أهلاً بيك في Yosef AI
             </div>
-
             <div class="welcome-text">
                 اكتب سؤالك أو استخدم + لإضافة صورة أو ملف.
+                <br>
                 ويمكنك استخدام المكالمة الصوتية أيضًا.
             </div>
         </div>
@@ -1043,7 +973,7 @@ def search_web(query):
             headers={
                 "User-Agent": "YosefAI/1.0",
             },
-            timeout=2.5,
+            timeout=5,
         )
 
         if response.status_code != 200:
@@ -1108,12 +1038,14 @@ def read_file(file):
             file.name or ""
         ).lower()
 
+
         if name.endswith(".txt"):
 
             return data.decode(
                 "utf-8",
                 errors="ignore",
             )
+
 
         if name.endswith(".pdf"):
 
@@ -1136,6 +1068,7 @@ def read_file(file):
                     parts.append(page_text)
 
             return "\n".join(parts)
+
 
         if name.endswith(".docx"):
 
@@ -1245,8 +1178,10 @@ def build_messages(
         }
     ]
 
+
     if extra_content:
         content.extend(extra_content)
+
 
     if needs_search(text):
 
@@ -1264,12 +1199,14 @@ def build_messages(
                 }
             )
 
+
     messages = [
         {
             "role": "system",
             "content": SYSTEM_PROMPT,
         }
     ]
+
 
     for message in st.session_state.messages[-6:]:
 
@@ -1280,12 +1217,14 @@ def build_messages(
             }
         )
 
+
     messages.append(
         {
             "role": "user",
             "content": content,
         }
     )
+
 
     return messages
 
@@ -1305,26 +1244,43 @@ def ask_yosef_stream(
             "أنا Yosef AI، وتم تطويري بواسطة يوسف."
         ]
 
+
     messages = build_messages(
         text,
         extra_content,
     )
+
 
     try:
 
         stream = client.chat.completions.create(
             model=MODEL,
             messages=messages,
-            max_tokens=300,
+            max_tokens=500,
             temperature=0.2,
             stream=True,
         )
 
         return stream
 
+
     except Exception as error:
 
         error_text = str(error)
+
+
+        if (
+            "401" in error_text
+            or "authentication" in error_text.lower()
+            or "unauthorized" in error_text.lower()
+        ):
+
+            st.error(
+                "❌ مفتاح OpenRouter غير صحيح أو غير مقروء من Secrets."
+            )
+
+            return None
+
 
         if (
             "429" in error_text
@@ -1338,6 +1294,7 @@ def ask_yosef_stream(
 
             return None
 
+
         if (
             "model" in error_text.lower()
             and (
@@ -1347,10 +1304,11 @@ def ask_yosef_stream(
         ):
 
             st.error(
-                "❌ الموديل المحدد غير متاح حاليًا."
+                "❌ النموذج المجاني غير متاح حاليًا. جرّب مرة أخرى."
             )
 
             return None
+
 
         st.error(
             "❌ حصل خطأ أثناء تشغيل Yosef AI."
@@ -1423,9 +1381,10 @@ if prompt:
 
         uploaded_file = None
 
-        if prompt.files:
 
+        if prompt.files:
             uploaded_file = prompt.files[0]
+
 
         if prompt.audio:
 
@@ -1443,6 +1402,7 @@ if prompt:
 
             text = spoken_text
 
+
         if (
             not text
             and not uploaded_file
@@ -1454,13 +1414,16 @@ if prompt:
 
             st.stop()
 
+
         extra_content = []
+
 
         if uploaded_file:
 
             file_type = (
                 uploaded_file.type or ""
             )
+
 
             if file_type.startswith("image/"):
 
@@ -1487,6 +1450,7 @@ if prompt:
                         },
                     }
                 )
+
 
             else:
 
@@ -1518,9 +1482,10 @@ if prompt:
                         }
                     )
 
-        # -------------------------------------------------
+
+        # =================================================
         # رسالة المستخدم
-        # -------------------------------------------------
+        # =================================================
 
         with st.chat_message(
             "user",
@@ -1530,11 +1495,13 @@ if prompt:
             if text:
                 st.markdown(text)
 
+
             if uploaded_file:
 
                 file_type = (
                     uploaded_file.type or ""
                 )
+
 
                 if file_type.startswith("image/"):
 
@@ -1547,9 +1514,10 @@ if prompt:
                         + uploaded_file.name
                     )
 
-        # -------------------------------------------------
+
+        # =================================================
         # رد Yosef
-        # -------------------------------------------------
+        # =================================================
 
         with st.chat_message(
             "assistant",
@@ -1564,15 +1532,19 @@ if prompt:
 
             placeholder = st.empty()
 
+
             stream_response = ask_yosef_stream(
                 text,
                 extra_content,
             )
 
+
             if stream_response is None:
                 st.stop()
 
+
             full_answer = ""
+
 
             try:
 
@@ -1589,6 +1561,7 @@ if prompt:
                         full_answer
                     )
 
+
                 else:
 
                     for chunk in stream_response:
@@ -1596,14 +1569,17 @@ if prompt:
                         if not chunk.choices:
                             continue
 
+
                         delta = (
                             chunk.choices[0].delta
                         )
+
 
                         piece = (
                             delta.content
                             or ""
                         )
+
 
                         if piece:
 
@@ -1612,6 +1588,7 @@ if prompt:
                             placeholder.markdown(
                                 full_answer
                             )
+
 
             except Exception as stream_error:
 
@@ -1627,7 +1604,9 @@ if prompt:
 
                     st.stop()
 
+
             status.empty()
+
 
             if not full_answer:
 
@@ -1637,17 +1616,20 @@ if prompt:
 
                 st.stop()
 
+
             full_answer = clean_answer(
                 full_answer
             )
+
 
             placeholder.markdown(
                 full_answer
             )
 
-        # -------------------------------------------------
+
+        # =================================================
         # حفظ المحادثة
-        # -------------------------------------------------
+        # =================================================
 
         st.session_state.messages.append(
             {
@@ -1656,6 +1638,7 @@ if prompt:
             }
         )
 
+
         st.session_state.messages.append(
             {
                 "role": "assistant",
@@ -1663,9 +1646,10 @@ if prompt:
             }
         )
 
+
     except Exception as error:
 
         st.error(
             "❌ حصل خطأ: "
             + str(error)
-        )
+            )

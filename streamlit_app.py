@@ -4,6 +4,7 @@ import base64
 import io
 import requests
 import speech_recognition as sr
+import time
 
 
 # =========================================================
@@ -35,7 +36,7 @@ client = OpenAI(
 
 
 # =========================================================
-# الموديل
+# الموديل الثابت
 # =========================================================
 
 MODEL = "nvidia/nemotron-nano-12b-v2-vl:free"
@@ -47,6 +48,9 @@ MODEL = "nvidia/nemotron-nano-12b-v2-vl:free"
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
+
+if "stop_generation" not in st.session_state:
+    st.session_state.stop_generation = False
 
 
 # =========================================================
@@ -69,6 +73,7 @@ SYSTEM_PROMPT = """
 من المطور؟
 مين صاحبك؟
 مين اللي عاملك؟
+مين صانعك؟
 
 أجب مباشرة:
 "أنا Yosef AI، وتم تطويري بواسطة يوسف."
@@ -78,6 +83,8 @@ SYSTEM_PROMPT = """
 أجب بنفس لغة المستخدم.
 
 كن طبيعيًا وودودًا ومختصرًا.
+
+اجعل الإجابات البسيطة قصيرة.
 
 لا تعرض التفكير الداخلي.
 
@@ -112,7 +119,7 @@ Analysis
 
 
 # =========================================================
-# CSS
+# CSS - شكل الشات
 # =========================================================
 
 st.markdown(
@@ -121,17 +128,29 @@ st.markdown(
 
     .yosef-title {
         text-align: center;
-        font-size: 38px;
+        font-size: 40px;
         font-weight: 800;
-        margin-top: 20px;
-        margin-bottom: 5px;
+        margin-top: 18px;
+        margin-bottom: 4px;
     }
 
     .yosef-subtitle {
         text-align: center;
         color: #888;
         font-size: 16px;
-        margin-bottom: 25px;
+        margin-bottom: 22px;
+    }
+
+    .stChatMessage {
+        border-radius: 18px;
+    }
+
+    div[data-testid="stChatMessage"] {
+        padding: 8px 4px;
+    }
+
+    button[kind="secondary"] {
+        border-radius: 14px;
     }
 
     </style>
@@ -169,6 +188,7 @@ if st.button(
 ):
 
     st.session_state.messages = []
+    st.session_state.stop_generation = False
 
     st.rerun()
 
@@ -197,6 +217,7 @@ def is_developer_question(text):
         "مين صانعك",
         "مين عمل البرنامج",
         "مين طور البرنامج",
+        "مين اللي طورك",
         "who developed you",
         "who made you",
         "who created you",
@@ -204,7 +225,6 @@ def is_developer_question(text):
     ]
 
     for word in developer_words:
-
         if word in text_lower:
             return True
 
@@ -220,7 +240,10 @@ def needs_search(text):
     if not text:
         return False
 
-    words = [
+    text_lower = text.lower()
+
+    # البحث يتم فقط عند الحاجة الفعلية
+    search_words = [
         "ابحث",
         "ابحثلي",
         "ابحث لي",
@@ -232,14 +255,27 @@ def needs_search(text):
         "من النت",
         "على الإنترنت",
         "من الإنترنت",
-        "الطقس",
-        "الجو",
-        "درجة الحرارة",
+        "search",
+        "google",
+        "look up",
+        "latest",
+        "recent",
+        "today",
+        "now",
+        "news",
+        "weather",
+        "price",
+        "prices",
+        "score",
+        "match",
         "أخبار",
         "اخبار",
         "خبر",
         "الأخبار",
         "الاخبار",
+        "الطقس",
+        "الجو",
+        "درجة الحرارة",
         "سعر",
         "أسعار",
         "اسعار",
@@ -262,25 +298,9 @@ def needs_search(text):
         "احدث",
         "آخر",
         "اخر",
-        "الجديد",
-        "today",
-        "now",
-        "latest",
-        "recent",
-        "news",
-        "weather",
-        "price",
-        "prices",
-        "score",
-        "match",
-        "search",
-        "google",
     ]
 
-    text_lower = text.lower()
-
-    for word in words:
-
+    for word in search_words:
         if word in text_lower:
             return True
 
@@ -288,7 +308,7 @@ def needs_search(text):
 
 
 # =========================================================
-# البحث على الإنترنت
+# البحث السريع على الإنترنت
 # =========================================================
 
 def search_web(query):
@@ -304,9 +324,9 @@ def search_web(query):
                 "skip_disambig": "1",
             },
             headers={
-                "User-Agent": "Mozilla/5.0 YosefAI",
+                "User-Agent": "YosefAI/1.0",
             },
-            timeout=5,
+            timeout=3,
         )
 
         if response.status_code != 200:
@@ -327,13 +347,11 @@ def search_web(query):
         )
 
         if abstract:
-
             results.append(
                 "معلومة: " + abstract
             )
 
         if abstract_url:
-
             results.append(
                 "المصدر: " + abstract_url
             )
@@ -343,12 +361,14 @@ def search_web(query):
             [],
         )
 
-        for item in topics[:5]:
+        count = 0
 
-            if not isinstance(
-                item,
-                dict,
-            ):
+        for item in topics:
+
+            if count >= 4:
+                break
+
+            if not isinstance(item, dict):
                 continue
 
             item_text = item.get(
@@ -362,23 +382,21 @@ def search_web(query):
             )
 
             if item_text:
-
                 results.append(
                     item_text
                 )
+                count += 1
 
             if item_url:
-
                 results.append(
                     "المصدر: " + item_url
                 )
 
         return "\n\n".join(
-            results[:10]
+            results[:8]
         )
 
     except Exception:
-
         return ""
 
 
@@ -399,11 +417,7 @@ def read_file(file):
             file.name or ""
         ).lower()
 
-
-        # -------------------------------------------------
         # TXT
-        # -------------------------------------------------
-
         if name.endswith(".txt"):
 
             return data.decode(
@@ -411,11 +425,7 @@ def read_file(file):
                 errors="ignore",
             )
 
-
-        # -------------------------------------------------
         # PDF
-        # -------------------------------------------------
-
         if name.endswith(".pdf"):
 
             from pypdf import PdfReader
@@ -434,18 +444,11 @@ def read_file(file):
                 )
 
                 if text:
-
-                    parts.append(
-                        text
-                    )
+                    parts.append(text)
 
             return "\n".join(parts)
 
-
-        # -------------------------------------------------
         # DOCX
-        # -------------------------------------------------
-
         if name.endswith(".docx"):
 
             from docx import Document
@@ -459,18 +462,14 @@ def read_file(file):
             for paragraph in document.paragraphs:
 
                 if paragraph.text:
-
                     parts.append(
                         paragraph.text
                     )
 
             return "\n".join(parts)
 
-
     except Exception:
-
         return ""
-
 
     return ""
 
@@ -512,7 +511,7 @@ def audio_to_text(audio):
 
 
 # =========================================================
-# تجهيز سؤال Yosef
+# تجهيز الرسائل
 # =========================================================
 
 def build_messages(
@@ -527,22 +526,13 @@ def build_messages(
         }
     ]
 
-
-    # -----------------------------------------------------
     # صورة أو ملف
-    # -----------------------------------------------------
-
     if extra_content:
-
         content.extend(
             extra_content
         )
 
-
-    # -----------------------------------------------------
-    # البحث
-    # -----------------------------------------------------
-
+    # بحث فقط إذا كان السؤال يحتاجه
     if needs_search(text):
 
         search_result = search_web(
@@ -556,15 +546,10 @@ def build_messages(
                     "type": "text",
                     "text": (
                         "نتائج من البحث على الإنترنت:\n\n"
-                        + search_result[:7000]
+                        + search_result[:6000]
                     ),
                 }
             )
-
-
-    # -----------------------------------------------------
-    # الرسائل
-    # -----------------------------------------------------
 
     messages = [
         {
@@ -573,8 +558,7 @@ def build_messages(
         }
     ]
 
-
-    # آخر 8 رسائل لتقليل وقت الطلب
+    # آخر 8 رسائل فقط
     for message in st.session_state.messages[-8:]:
 
         messages.append(
@@ -584,7 +568,6 @@ def build_messages(
             }
         )
 
-
     messages.append(
         {
             "role": "user",
@@ -592,8 +575,42 @@ def build_messages(
         }
     )
 
-
     return messages
+
+
+# =========================================================
+# تنظيف الرد
+# =========================================================
+
+def clean_answer(answer):
+
+    if not answer:
+        return ""
+
+    answer = str(answer).strip()
+
+    forbidden_phrases = [
+        "Here's a thinking process:",
+        "Here is a thinking process:",
+        "First, I need to check",
+        "Analyze User Input:",
+        "Analysis:",
+        "تحليل المستخدم:",
+        "سأحلل المستخدم:",
+        "أفكر خطوة بخطوة:",
+    ]
+
+    for phrase in forbidden_phrases:
+
+        if answer.startswith(phrase):
+
+            answer = answer.replace(
+                phrase,
+                "",
+                1,
+            ).strip()
+
+    return answer
 
 
 # =========================================================
@@ -605,44 +622,33 @@ def ask_yosef_stream(
     extra_content=None,
 ):
 
-    # -----------------------------------------------------
-    # المطور
-    # -----------------------------------------------------
-
+    # سؤال المطور لا يحتاج API
     if is_developer_question(text):
 
         return [
             "أنا Yosef AI، وتم تطويري بواسطة يوسف."
         ]
 
-
     messages = build_messages(
         text,
         extra_content,
     )
-
 
     try:
 
         stream = client.chat.completions.create(
             model=MODEL,
             messages=messages,
-            max_tokens=450,
-            temperature=0.3,
+            max_tokens=350,
+            temperature=0.2,
             stream=True,
         )
 
         return stream
 
-
     except Exception as error:
 
         error_text = str(error)
-
-
-        # -------------------------------------------------
-        # Rate Limit
-        # -------------------------------------------------
 
         if (
             "429" in error_text
@@ -655,11 +661,6 @@ def ask_yosef_stream(
             )
 
             return None
-
-
-        # -------------------------------------------------
-        # موديل غير متاح
-        # -------------------------------------------------
 
         if (
             "model" in error_text.lower()
@@ -674,11 +675,6 @@ def ask_yosef_stream(
             )
 
             return None
-
-
-        # -------------------------------------------------
-        # خطأ آخر
-        # -------------------------------------------------
 
         st.error(
             "❌ حصل خطأ أثناء تشغيل Yosef AI."
@@ -734,12 +730,14 @@ if prompt:
 
     try:
 
+        # نعيد زر الإيقاف للحالة الطبيعية
+        st.session_state.stop_generation = False
+
         text = (
             prompt.text or ""
         )
 
         uploaded_file = None
-
 
         # -------------------------------------------------
         # الملف
@@ -750,7 +748,6 @@ if prompt:
             uploaded_file = (
                 prompt.files[0]
             )
-
 
         # -------------------------------------------------
         # الصوت
@@ -772,7 +769,6 @@ if prompt:
 
             text = spoken_text
 
-
         # -------------------------------------------------
         # التأكد من المحتوى
         # -------------------------------------------------
@@ -788,13 +784,11 @@ if prompt:
 
             st.stop()
 
-
         # -------------------------------------------------
-        # تجهيز المحتوى الإضافي
+        # تجهيز الصورة أو الملف
         # -------------------------------------------------
 
         extra_content = []
-
 
         if uploaded_file:
 
@@ -802,11 +796,7 @@ if prompt:
                 uploaded_file.type or ""
             )
 
-
-            # =============================================
             # صورة
-            # =============================================
-
             if file_type.startswith(
                 "image/"
             ):
@@ -835,11 +825,7 @@ if prompt:
                     }
                 )
 
-
-            # =============================================
             # ملف
-            # =============================================
-
             else:
 
                 file_text = read_file(
@@ -870,7 +856,6 @@ if prompt:
                         }
                     )
 
-
         # -------------------------------------------------
         # عرض رسالة المستخدم
         # -------------------------------------------------
@@ -880,18 +865,13 @@ if prompt:
         ):
 
             if text:
-
-                st.markdown(
-                    text
-                )
-
+                st.markdown(text)
 
             if uploaded_file:
 
                 file_type = (
                     uploaded_file.type or ""
                 )
-
 
                 if file_type.startswith(
                     "image/"
@@ -908,17 +888,28 @@ if prompt:
                         + uploaded_file.name
                     )
 
-
         # -------------------------------------------------
-        # الرد Streaming
+        # الرد
         # -------------------------------------------------
 
         with st.chat_message(
             "assistant"
         ):
 
+            # زر إيقاف الرد
+            stop_button = st.button(
+                "⏹️ إيقاف الرد",
+                key="stop_response_button",
+                use_container_width=True,
+            )
+
+            if stop_button:
+
+                st.session_state.stop_generation = True
+
             placeholder = st.empty()
 
+            # نطلب الرد
             with st.spinner(
                 "🤖 Yosef AI بيفكر..."
             ):
@@ -928,49 +919,65 @@ if prompt:
                     extra_content,
                 )
 
-
             if stream_response is None:
-
                 st.stop()
-
 
             full_answer = ""
 
-
-            # =============================================
-            # عرض الرد جزء بجزء
-            # =============================================
+            # -------------------------------------------------
+            # الرد المباشر
+            # -------------------------------------------------
 
             try:
 
-                for chunk in stream_response:
+                # لو الرد المباشر من سؤال المطور
+                if isinstance(
+                    stream_response,
+                    list,
+                ):
 
-                    if not chunk.choices:
-
-                        continue
-
-
-                    delta = (
-                        chunk
-                        .choices[0]
-                        .delta
+                    full_answer = (
+                        stream_response[0]
                     )
 
-
-                    piece = (
-                        delta.content
-                        or ""
+                    placeholder.markdown(
+                        full_answer
                     )
 
+                else:
 
-                    if piece:
+                    for chunk in stream_response:
 
-                        full_answer += piece
+                        # التحقق من الإيقاف
+                        if st.session_state.stop_generation:
 
-                        placeholder.markdown(
-                            full_answer
+                            break
+
+                        if not chunk.choices:
+                            continue
+
+                        delta = (
+                            chunk
+                            .choices[0]
+                            .delta
                         )
 
+                        piece = (
+                            delta.content
+                            or ""
+                        )
+
+                        if piece:
+
+                            full_answer += piece
+
+                            placeholder.markdown(
+                                full_answer
+                            )
+
+                            # تأخير صغير جدًا حتى يظهر
+                            # الـ streaming بسلاسة
+                            time.sleep(0.005)
 
             except Exception as stream_error:
 
@@ -986,6 +993,20 @@ if prompt:
 
                     st.stop()
 
+            # -------------------------------------------------
+            # لو المستخدم أوقف الرد
+            # -------------------------------------------------
+
+            if (
+                st.session_state.stop_generation
+                and full_answer
+            ):
+
+                full_answer += "\n\n⏹️ تم إيقاف الرد."
+
+                placeholder.markdown(
+                    full_answer
+                )
 
             # -------------------------------------------------
             # التأكد من الرد
@@ -999,6 +1020,9 @@ if prompt:
 
                 st.stop()
 
+            full_answer = clean_answer(
+                full_answer
+            )
 
         # -------------------------------------------------
         # حفظ المحادثة
@@ -1011,7 +1035,6 @@ if prompt:
             }
         )
 
-
         st.session_state.messages.append(
             {
                 "role": "assistant",
@@ -1019,10 +1042,12 @@ if prompt:
             }
         )
 
+        # إعادة زر الإيقاف للحالة الطبيعية
+        st.session_state.stop_generation = False
 
     except Exception as error:
 
         st.error(
             "❌ حصل خطأ: "
             + str(error)
-    )
+            )

@@ -18,14 +18,15 @@ st.set_page_config(
 # الإعدادات
 # =========================================================
 
-OPENROUTER_KEY = st.secrets.get("OPENROUTER_API_KEY", "")
+OPENROUTER_KEY = st.secrets.get(
+    "OPENROUTER_API_KEY",
+    ""
+)
 
 MODEL = "openrouter/free"
 
-OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-
-FREE_LIMIT = int(
-    st.secrets.get("FREE_MESSAGE_LIMIT", 10)
+OPENROUTER_URL = (
+    "https://openrouter.ai/api/v1/chat/completions"
 )
 
 PRO_PAYMENT_URL = st.secrets.get(
@@ -43,9 +44,11 @@ PRO_CODE = st.secrets.get(
 # =========================================================
 
 if not OPENROUTER_KEY:
+
     st.error(
         "❌ مفتاح OPENROUTER_API_KEY غير موجود في Secrets."
     )
+
     st.stop()
 
 # =========================================================
@@ -53,12 +56,12 @@ if not OPENROUTER_KEY:
 # =========================================================
 
 if "messages" not in st.session_state:
+
     st.session_state.messages = []
 
-if "message_count" not in st.session_state:
-    st.session_state.message_count = 0
 
 if "plan" not in st.session_state:
+
     st.session_state.plan = "Free"
 
 # =========================================================
@@ -111,7 +114,9 @@ st.markdown(
 )
 
 st.markdown(
-    '<div class="yosef-subtitle">مساعدك الذكي للنصوص والصور والملفات والصوت</div>',
+    '<div class="yosef-subtitle">'
+    'مساعدك الذكي للنصوص والصور والملفات والصوت'
+    '</div>',
     unsafe_allow_html=True,
 )
 
@@ -121,16 +126,11 @@ st.markdown(
 
 if st.session_state.plan == "Free":
 
-    remaining = max(
-        FREE_LIMIT - st.session_state.message_count,
-        0
-    )
-
     st.markdown(
-        f"""
+        """
         <div class="plan">
         🆓 <b>Free</b><br>
-        متبقي <b>{remaining}</b> رسالة
+        استخدام مجاني مفتوح
         </div>
         """,
         unsafe_allow_html=True,
@@ -197,11 +197,13 @@ who is your developer
 def developer_question(text):
 
     if not text:
+
         return False
 
     text = text.lower().strip()
 
     words = [
+
         "مين مطورك",
         "مين المطور",
         "مين عملك",
@@ -210,6 +212,7 @@ def developer_question(text):
         "مين صنعك",
         "مين اللي عاملك",
         "مين طور البرنامج",
+
         "who developed you",
         "who made you",
         "who created you",
@@ -228,9 +231,11 @@ def developer_question(text):
 def should_search(text):
 
     if not text:
+
         return False
 
     keywords = [
+
         "ابحث",
         "ابحثلي",
         "ابحث لي",
@@ -278,20 +283,31 @@ def web_search(query):
     try:
 
         response = requests.get(
+
             "https://api.duckduckgo.com/",
+
             params={
+
                 "q": query,
+
                 "format": "json",
+
                 "no_html": "1",
+
                 "skip_disambig": "1",
             },
+
             timeout=8,
+
             headers={
-                "User-Agent": "YosefAI/1.0"
+
+                "User-Agent":
+                    "YosefAI/1.0"
             },
         )
 
         if response.status_code != 200:
+
             return ""
 
         data = response.json()
@@ -304,7 +320,10 @@ def web_search(query):
         )
 
         if abstract:
-            results.append(abstract)
+
+            results.append(
+                abstract
+            )
 
         for item in data.get(
             "RelatedTopics",
@@ -312,9 +331,13 @@ def web_search(query):
         ):
 
             if len(results) >= 5:
+
                 break
 
-            if isinstance(item, dict):
+            if isinstance(
+                item,
+                dict
+            ):
 
                 text = item.get(
                     "Text",
@@ -322,11 +345,17 @@ def web_search(query):
                 )
 
                 if text:
-                    results.append(text)
 
-        return "\n\n".join(results)[:6000]
+                    results.append(
+                        text
+                    )
+
+        return "\n\n".join(
+            results
+        )[:6000]
 
     except Exception:
+
         return ""
 
 # =========================================================
@@ -368,9 +397,14 @@ def read_file(file):
                 )
 
                 if page_text:
-                    text.append(page_text)
 
-            return "\n".join(text)
+                    text.append(
+                        page_text
+                    )
+
+            return "\n".join(
+                text
+            )
 
         # DOCX
         if name.endswith(".docx"):
@@ -386,15 +420,21 @@ def read_file(file):
             for paragraph in doc.paragraphs:
 
                 if paragraph.text:
+
                     text.append(
                         paragraph.text
                     )
 
-            return "\n".join(text)
+            return "\n".join(
+                text
+            )
 
     except Exception as error:
 
-        return f"تعذر قراءة الملف: {error}"
+        return (
+            "تعذر قراءة الملف: "
+            + str(error)
+        )
 
     return ""
 
@@ -408,40 +448,60 @@ def create_messages(
 ):
 
     messages = [
+
         {
             "role": "system",
             "content": SYSTEM_PROMPT
         }
+
     ]
 
     # ذاكرة آخر 8 رسائل
-    for message in st.session_state.messages[-8:]:
+
+    for message in (
+        st.session_state.messages[-8:]
+    ):
 
         messages.append({
-            "role": message["role"],
-            "content": message["content"]
+
+            "role":
+                message["role"],
+
+            "content":
+                message["content"]
         })
 
-    content = []
+    content = [
 
-    content.append({
-        "type": "text",
-        "text": (
-            user_text
-            if user_text
-            else "حلل المحتوى المرفق."
-        )
-    })
+        {
+            "type": "text",
+
+            "text": (
+
+                user_text
+
+                if user_text
+
+                else
+                "حلل المحتوى المرفق."
+            )
+        }
+
+    ]
 
     # صورة أو ملف
+
     if extra_content:
 
         content.extend(
             extra_content
         )
 
-    # بحث
-    if should_search(user_text):
+    # البحث
+
+    if should_search(
+        user_text
+    ):
 
         result = web_search(
             user_text
@@ -450,7 +510,9 @@ def create_messages(
         if result:
 
             content.append({
+
                 "type": "text",
+
                 "text": (
                     "هذه معلومات من البحث "
                     "على الإنترنت، استخدمها "
@@ -460,7 +522,9 @@ def create_messages(
             })
 
     messages.append({
+
         "role": "user",
+
         "content": content
     })
 
@@ -476,6 +540,7 @@ def ask_ai(
 ):
 
     # إجابة المطور مباشرة
+
     if developer_question(
         user_text
     ):
@@ -485,11 +550,14 @@ def ask_ai(
         )
 
     messages = create_messages(
+
         user_text,
+
         extra_content
     )
 
     headers = {
+
         "Authorization":
             f"Bearer {OPENROUTER_KEY}",
 
@@ -504,29 +572,43 @@ def ask_ai(
     }
 
     payload = {
-        "model": MODEL,
-        "messages": messages,
-        "max_tokens": 1000,
-        "temperature": 0.3,
+
+        "model":
+            MODEL,
+
+        "messages":
+            messages,
+
+        "max_tokens":
+            1000,
+
+        "temperature":
+            0.3,
     }
 
     try:
 
         response = requests.post(
+
             OPENROUTER_URL,
+
             headers=headers,
+
             json=payload,
+
             timeout=90,
         )
 
         # مفتاح خطأ
+
         if response.status_code == 401:
 
             return (
                 "❌ مفتاح OpenRouter غير صحيح."
             )
 
-        # الحد
+        # الحد من OpenRouter نفسه
+
         if response.status_code == 429:
 
             return (
@@ -535,6 +617,7 @@ def ask_ai(
             )
 
         # السيرفر
+
         if response.status_code >= 500:
 
             return (
@@ -543,18 +626,17 @@ def ask_ai(
             )
 
         # أخطاء أخرى
+
         if response.status_code != 200:
 
             try:
 
                 data = response.json()
 
-                error = data.get(
-                    "error",
-                    {}
-                ).get(
-                    "message",
-                    ""
+                error = (
+                    data
+                    .get("error", {})
+                    .get("message", "")
                 )
 
             except Exception:
@@ -580,23 +662,30 @@ def ask_ai(
             )
 
         answer = (
+
             choices[0]
+
             .get("message", {})
+
             .get("content", "")
         )
 
         # بعض النماذج قد ترجع List
+
         if isinstance(
             answer,
             list
         ):
 
             answer = "".join(
+
                 item.get(
                     "text",
                     ""
                 )
+
                 for item in answer
+
                 if isinstance(
                     item,
                     dict
@@ -638,15 +727,22 @@ def ask_ai(
 # المحادثة القديمة
 # =========================================================
 
-for message in st.session_state.messages:
+for message in (
+    st.session_state.messages
+):
 
     role = message["role"]
 
     with st.chat_message(
+
         role,
+
         avatar=(
+
             "👤"
+
             if role == "user"
+
             else "🤖"
         )
     ):
@@ -664,22 +760,25 @@ col1, col2 = st.columns(2)
 with col1:
 
     if st.button(
+
         "🆕 محادثة جديدة",
+
         use_container_width=True
     ):
 
         st.session_state.messages = []
 
-        st.session_state.message_count = 0
-
         st.rerun()
 
 with col2:
 
-    if st.session_state.plan == "Free":
+    if (
+        st.session_state.plan
+        == "Free"
+    ):
 
         st.info(
-            f"🆓 {max(FREE_LIMIT - st.session_state.message_count, 0)} رسالة"
+            "🆓 استخدام مجاني"
         )
 
     else:
@@ -692,7 +791,9 @@ with col2:
 # Pro
 # =========================================================
 
-with st.expander("⭐ الترقية إلى Yosef AI Pro"):
+with st.expander(
+    "⭐ الترقية إلى Yosef AI Pro"
+):
 
     st.write(
         "احصل على استخدام أكبر ومميزات إضافية."
@@ -701,8 +802,11 @@ with st.expander("⭐ الترقية إلى Yosef AI Pro"):
     if PRO_PAYMENT_URL:
 
         st.link_button(
+
             "💳 اشترك في Pro",
+
             PRO_PAYMENT_URL,
+
             use_container_width=True
         )
 
@@ -715,7 +819,9 @@ with st.expander("⭐ الترقية إلى Yosef AI Pro"):
     if PRO_CODE:
 
         code = st.text_input(
+
             "كود Pro",
+
             type="password"
         )
 
@@ -745,9 +851,13 @@ with st.expander("⭐ الترقية إلى Yosef AI Pro"):
 # =========================================================
 
 prompt = st.chat_input(
+
     "اكتب رسالتك...",
+
     accept_file=True,
+
     file_type=[
+
         "png",
         "jpg",
         "jpeg",
@@ -763,28 +873,6 @@ prompt = st.chat_input(
 # =========================================================
 
 if prompt:
-
-    # Free limit
-    if (
-        st.session_state.plan == "Free"
-        and
-        st.session_state.message_count
-        >= FREE_LIMIT
-    ):
-
-        st.warning(
-            "🆓 خلصت رسائلك المجانية."
-        )
-
-        if PRO_PAYMENT_URL:
-
-            st.link_button(
-                "⭐ الترقية إلى Pro",
-                PRO_PAYMENT_URL,
-                use_container_width=True
-            )
-
-        st.stop()
 
     user_text = (
         prompt.text
@@ -813,6 +901,7 @@ if prompt:
         )
 
         # صورة
+
         if file_type.startswith(
             "image/"
         ):
@@ -822,10 +911,11 @@ if prompt:
                 .getvalue()
             )
 
-            encoded = base64.b64encode(
-                image_data
-            ).decode(
-                "utf-8"
+            encoded = (
+                base64.b64encode(
+                    image_data
+                )
+                .decode("utf-8")
             )
 
             extra_content.append({
@@ -841,6 +931,7 @@ if prompt:
             })
 
         # ملف
+
         else:
 
             file_text = read_file(
@@ -864,7 +955,9 @@ if prompt:
     # =====================================================
 
     with st.chat_message(
+
         "user",
+
         avatar="👤"
     ):
 
@@ -877,8 +970,11 @@ if prompt:
         if uploaded_file:
 
             if (
+
                 uploaded_file.type
+
                 and
+
                 uploaded_file.type.startswith(
                     "image/"
                 )
@@ -900,7 +996,9 @@ if prompt:
     # =====================================================
 
     with st.chat_message(
+
         "assistant",
+
         avatar="🤖"
     ):
 
@@ -909,7 +1007,9 @@ if prompt:
         ):
 
             answer = ask_ai(
+
                 user_text,
+
                 extra_content
             )
 
@@ -938,5 +1038,3 @@ if prompt:
         "content":
             answer
     })
-
-    st.session_state.message_count += 1

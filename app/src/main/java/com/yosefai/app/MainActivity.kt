@@ -2,19 +2,17 @@ package com.yosefai.app
 
 import android.app.Activity
 import android.os.Bundle
-import android.content.Intent
-import android.net.Uri
+import android.widget.TextView
 
 class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val url = "https://yosef-ai-2pzqmuovs4ggxc5wyvz8ce.streamlit.app/"
+        val text = TextView(this)
+        text.text = "Yosef AI"
+        text.textSize = 32f
 
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-        startActivity(intent)
-
-        finish()
+        setContentView(text)
     }
 }

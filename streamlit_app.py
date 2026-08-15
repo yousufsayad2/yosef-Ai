@@ -29,8 +29,6 @@ client = OpenAI(
     api_key=api_key
 )
 
-# يمكنك وضع موديل معين في Secrets باسم OPENROUTER_MODEL
-# ولو مش موجود، هيستخدم openrouter/free
 MODEL_NAME = st.secrets.get(
     "OPENROUTER_MODEL",
     "openrouter/free"
@@ -57,33 +55,29 @@ system_prompt = """
 
 اسمك Yosef AI.
 
-لا تقل إنك ChatGPT أو المساعد الرسمي لـ OpenAI.
+لا تقل إنك ChatGPT.
 
 أجب باللغة التي يستخدمها المستخدم.
 
 كن طبيعيًا وودودًا ومفيدًا.
 
-تعامل مع المستخدم كأنك مساعد شخصي ذكي.
-
 في المحادثة الصوتية:
 - تحدث بطريقة طبيعية.
 - اجعل الرد واضحًا ومختصرًا.
 - لا تستخدم مقدمات طويلة.
-- لا تكرر كلام المستخدم بدون سبب.
-
-إذا تم إعطاؤك معلومات من البحث على الإنترنت:
-- استخدم المعلومات المتاحة.
-- لا تخترع معلومات.
-- إذا كانت المعلومات غير كافية، قل ذلك بوضوح.
-- لا تذكر تفاصيل البحث الداخلية للمستخدم.
+- تعامل مع المستخدم كأنه يتحدث مع مساعد صوتي.
 
 إذا أرسل المستخدم صورة:
-- حلل الصورة قدر الإمكان.
+- حلل الصورة.
 - لا تخترع تفاصيل غير واضحة.
 
 إذا أرسل المستخدم ملفًا:
-- استخدم محتوى الملف إذا كان متاحًا.
-- إذا كان المحتوى غير متاح، وضح ذلك.
+- استخدم المعلومات المتاحة منه.
+- لا تخترع محتوى الملف.
+
+إذا أعطيتك معلومات من البحث:
+- استخدم المعلومات الموجودة.
+- لا تخترع معلومات غير موجودة.
 """
 
 
@@ -94,7 +88,6 @@ system_prompt = """
 st.markdown(
     """
     <style>
-
     .yosef-title {
         text-align: center;
         font-size: 34px;
@@ -109,7 +102,6 @@ st.markdown(
         margin-bottom: 20px;
         font-size: 16px;
     }
-
     </style>
     """,
     unsafe_allow_html=True
@@ -143,30 +135,22 @@ if st.button(
     use_container_width=True,
     key="new_chat"
 ):
-
     st.session_state.messages = []
     st.session_state.voice_call = False
-
     st.rerun()
 
 
 # =========================================================
-# عرض المحادثة السابقة
+# عرض المحادثة
 # =========================================================
 
 for message in st.session_state.messages:
-
-    with st.chat_message(
-        message["role"]
-    ):
-
-        st.markdown(
-            message["content"]
-        )
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
 
 # =========================================================
-# تحديد هل السؤال يحتاج بحث
+# البحث الذكي
 # =========================================================
 
 def needs_web_search(text):
@@ -174,11 +158,7 @@ def needs_web_search(text):
     if not text:
         return False
 
-    text_lower = text.lower().strip()
-
-    # -----------------------------------------------------
-    # المستخدم طلب البحث صراحة
-    # -----------------------------------------------------
+    text_lower = text.lower()
 
     explicit_words = [
         "ابحث",
@@ -188,11 +168,9 @@ def needs_web_search(text):
         "دور لي",
         "شوفلي",
         "شوف لي",
-        "هاتلي معلومات",
-        "هات لي معلومات",
-        "على الانترنت",
-        "علي الانترنت",
+        "على النت",
         "من النت",
+        "على الإنترنت",
         "من الإنترنت",
         "search",
         "google",
@@ -200,33 +178,24 @@ def needs_web_search(text):
     ]
 
     for word in explicit_words:
-
         if word in text_lower:
             return True
 
-
-    # -----------------------------------------------------
-    # معلومات حديثة
-    # -----------------------------------------------------
-
     current_words = [
+        "اليوم",
         "دلوقتي",
         "دلوقت",
         "الآن",
-        "ان",
-        "حاليًا",
         "حاليا",
-        "اليوم",
+        "حاليًا",
         "النهارده",
         "بكره",
         "غدا",
-        "امبارح",
         "آخر",
         "اخر",
         "أحدث",
         "احدث",
         "الجديد",
-        "حالي",
         "current",
         "today",
         "now",
@@ -235,14 +204,8 @@ def needs_web_search(text):
     ]
 
     for word in current_words:
-
         if word in text_lower:
             return True
-
-
-    # -----------------------------------------------------
-    # أخبار وطقس وأسعار
-    # -----------------------------------------------------
 
     live_topics = [
         "أخبار",
@@ -253,7 +216,6 @@ def needs_web_search(text):
         "الطقس",
         "الجو",
         "درجة الحرارة",
-        "حرارة",
         "مطر",
         "رياح",
         "سعر",
@@ -279,26 +241,53 @@ def needs_web_search(text):
     ]
 
     for word in live_topics:
-
         if word in text_lower:
             return True
 
+    return False
 
-    # -----------------------------------------------------
-    # أسئلة معلوماتية تستفيد من البحث
-    # -----------------------------------------------------
 
-    factual_patterns = [
-        "مين هو",
-        "مين هي",
-        "من هو",
-        "من هي",
-        "ما هو",
-        "ما هي",
-        "ايه هو",
-        "ايه هي",
-        "ما معنى",
-        "معنى",
-        "معلومات عن",
-        "معلومات حول",
-        "
+# =========================================================
+# البحث على الإنترنت
+# =========================================================
+
+def search_web(query):
+
+    try:
+
+        response = requests.get(
+            "https://html.duckduckgo.com/html/",
+            params={"q": query},
+            headers={"User-Agent": "Mozilla/5.0"},
+            timeout=10
+        )
+
+        if response.status_code != 200:
+            return []
+
+        pattern = re.compile(
+            r'class="result__a"[^>]*href="([^"]+)"[^>]*>(.*?)</a>',
+            re.IGNORECASE | re.DOTALL
+        )
+
+        matches = pattern.findall(response.text)
+
+        results = []
+
+        for href, title in matches[:5]:
+
+            clean_title = re.sub(
+                r"<.*?>",
+                "",
+                title
+            ).strip()
+
+            if clean_title and href:
+                results.append(
+                    {
+                        "title": clean_title,
+                        "href": href
+                    }
+                )
+
+       

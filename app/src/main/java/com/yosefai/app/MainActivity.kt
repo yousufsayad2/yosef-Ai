@@ -1,7 +1,8 @@
 package com.yosefai.app
 
 import android.os.Bundle
-import android.widget.TextView
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
 
 class MainActivity : ComponentActivity() {
@@ -9,10 +10,20 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val textView = TextView(this)
-        textView.text = "Yosef AI"
-        textView.textSize = 28f
+        val webView = WebView(this)
 
-        setContentView(textView)
+        webView.settings.javaScriptEnabled = true
+        webView.settings.domStorageEnabled = true
+        webView.settings.loadsImagesAutomatically = true
+        webView.settings.allowFileAccess = true
+        webView.settings.allowContentAccess = true
+
+        webView.webViewClient = WebViewClient()
+
+        webView.loadUrl(
+            "https://yosef-ai-2pzqmuovs4ggxc5wyvz8ce.streamlit.app/"
+        )
+
+        setContentView(webView)
     }
 }

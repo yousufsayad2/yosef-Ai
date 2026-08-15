@@ -1,19 +1,28 @@
-package com.yosefai.app
+<?xml version="1.0" encoding="utf-8"?>
 
-import android.app.Activity
-import android.os.Bundle
-import android.widget.TextView
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-class MainActivity : Activity() {
+    <uses-permission android:name="android.permission.INTERNET" />
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
+    <application
+        android:label="Yosef AI"
+        android:allowBackup="false"
+        android:supportsRtl="true"
+        android:hardwareAccelerated="true"
+        android:usesCleartextTraffic="true"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
-        val text = TextView(this)
-        text.text = "Yosef AI\nالتطبيق اشتغل بنجاح"
-        text.textSize = 24f
-        text.setPadding(40, 40, 40, 40)
+        <activity
+            android:name="com.yosefai.app.MainActivity"
+            android:exported="true">
 
-        setContentView(text)
-    }
-}
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+        </activity>
+
+    </application>
+
+</manifest>

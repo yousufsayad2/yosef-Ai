@@ -9,10 +9,11 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val text = TextView(this)
-        text.text = "Yosef AI"
-        text.textSize = 32f
+        val textView = TextView(this)
+        textView.text = "Yosef AI"
+        textView.textSize = 32f
+        textView.setPadding(40, 40, 40, 40)
 
-        setContentView(text)
+        setContentView(textView)
     }
 }

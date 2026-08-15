@@ -2,9 +2,6 @@ import streamlit as st
 import requests
 import base64
 import io
-import json
-import speech_recognition as sr
-
 
 # =========================================================
 # إعداد الصفحة
@@ -17,43 +14,152 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-
 # =========================================================
-# API
+# الإعدادات
 # =========================================================
 
-OPENROUTER_KEY = st.secrets.get("OPENROUTER_API_KEY")
+OPENROUTER_KEY = st.secrets.get("OPENROUTER_API_KEY", "")
 
 MODEL = "openrouter/free"
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
+FREE_LIMIT = int(
+    st.secrets.get("FREE_MESSAGE_LIMIT", 10)
+)
 
-if not OPENROUTER_KEY:
-    st.error("❌ OPENROUTER_API_KEY غير موجود في Secrets.")
-    st.stop()
+PRO_PAYMENT_URL = st.secrets.get(
+    "PRO_PAYMENT_URL",
+    ""
+)
 
+PRO_CODE = st.secrets.get(
+    "PRO_ACCESS_CODE",
+    ""
+)
 
 # =========================================================
-# الذاكرة
+# التحقق من API
+# =========================================================
+
+if not OPENROUTER_KEY:
+    st.error(
+        "❌ مفتاح OPENROUTER_API_KEY غير موجود في Secrets."
+    )
+    st.stop()
+
+# =========================================================
+# Session State
 # =========================================================
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+if "message_count" not in st.session_state:
+    st.session_state.message_count = 0
+
+if "plan" not in st.session_state:
+    st.session_state.plan = "Free"
 
 # =========================================================
-# تعليمات Yosef AI
+# التصميم
+# =========================================================
+
+st.markdown(
+    """
+    <style>
+
+    .block-container {
+        max-width: 900px;
+        padding-top: 2rem;
+        padding-bottom: 5rem;
+    }
+
+    .yosef-title {
+        text-align: center;
+        font-size: 42px;
+        font-weight: 800;
+        margin-bottom: 5px;
+    }
+
+    .yosef-subtitle {
+        text-align: center;
+        color: #888;
+        margin-bottom: 25px;
+    }
+
+    .plan {
+        padding: 12px;
+        border-radius: 15px;
+        text-align: center;
+        margin-bottom: 15px;
+        border: 1px solid #444;
+    }
+
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+# =========================================================
+# العنوان
+# =========================================================
+
+st.markdown(
+    '<div class="yosef-title">🤖 Yosef AI</div>',
+    unsafe_allow_html=True,
+)
+
+st.markdown(
+    '<div class="yosef-subtitle">مساعدك الذكي للنصوص والصور والملفات والصوت</div>',
+    unsafe_allow_html=True,
+)
+
+# =========================================================
+# حالة الخطة
+# =========================================================
+
+if st.session_state.plan == "Free":
+
+    remaining = max(
+        FREE_LIMIT - st.session_state.message_count,
+        0
+    )
+
+    st.markdown(
+        f"""
+        <div class="plan">
+        🆓 <b>Free</b><br>
+        متبقي <b>{remaining}</b> رسالة
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+else:
+
+    st.markdown(
+        """
+        <div class="plan">
+        ⭐ <b>Yosef AI Pro</b><br>
+        حساب Pro نشط
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+# =========================================================
+# النظام الأساسي
 # =========================================================
 
 SYSTEM_PROMPT = """
 أنت Yosef AI.
 
-اسمك دائمًا Yosef AI.
+اسمك Yosef AI.
 
 تم تطويرك بواسطة يوسف.
 
-إذا سأل المستخدم:
+إذا سألك المستخدم:
 مين مطورك؟
 مين عملك؟
 مين طورك؟
@@ -62,6 +168,7 @@ SYSTEM_PROMPT = """
 who developed you
 who made you
 who created you
+who is your developer
 
 أجب:
 أنا Yosef AI، وتم تطويري بواسطة يوسف.
@@ -70,91 +177,24 @@ who created you
 
 أجب بنفس لغة المستخدم.
 
-كن طبيعيًا وودودًا ومختصرًا.
+كن مفيدًا وطبيعيًا وواضحًا.
 
-لا تعرض التفكير الداخلي أو خطوات التحليل.
+لا تعرض التفكير الداخلي.
 
-إذا أرسل المستخدم صورة، حلل الأشياء الظاهرة فيها فقط.
+إذا أرسل المستخدم صورة:
+حلل الصورة والمعلومات الظاهرة فيها فقط.
 
-إذا أرسل ملفًا، استخدم محتواه المتاح.
+إذا أرسل ملفًا:
+استخدم محتوى الملف المتاح لك.
 
 لا تخترع معلومات.
 """
-
-
-# =========================================================
-# شكل الصفحة
-# =========================================================
-
-st.markdown(
-    """
-    <style>
-
-    .block-container {
-        max-width: 850px;
-        padding-top: 2rem;
-        padding-bottom: 6rem;
-    }
-
-    .title {
-        text-align: center;
-        font-size: 38px;
-        font-weight: 800;
-        margin-bottom: 5px;
-    }
-
-    .subtitle {
-        text-align: center;
-        color: #888;
-        font-size: 15px;
-        margin-bottom: 25px;
-    }
-
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
-
-
-# =========================================================
-# العنوان
-# =========================================================
-
-st.markdown(
-    '<div class="title">🤖 Yosef AI</div>',
-    unsafe_allow_html=True,
-)
-
-st.markdown(
-    '<div class="subtitle">مساعدك الذكي — نص، صور، ملفات وصوت.</div>',
-    unsafe_allow_html=True,
-)
-
-
-# =========================================================
-# الترحيب
-# =========================================================
-
-if not st.session_state.messages:
-
-    with st.container(border=True):
-
-        st.markdown("### 👋 أهلاً بيك في Yosef AI")
-
-        st.write(
-            "اكتب سؤالك أو استخدم زر + لإضافة صورة أو ملف."
-        )
-
-        st.write(
-            "ويمكنك أيضًا إرسال رسالة صوتية."
-        )
-
 
 # =========================================================
 # سؤال المطور
 # =========================================================
 
-def is_developer_question(text):
+def developer_question(text):
 
     if not text:
         return False
@@ -169,7 +209,6 @@ def is_developer_question(text):
         "مين مبرمجك",
         "مين صنعك",
         "مين اللي عاملك",
-        "مين صاحبك",
         "مين طور البرنامج",
         "who developed you",
         "who made you",
@@ -177,34 +216,31 @@ def is_developer_question(text):
         "who is your developer",
     ]
 
-    return any(word in text for word in words)
-
+    return any(
+        word in text
+        for word in words
+    )
 
 # =========================================================
-# البحث
+# البحث على الإنترنت
 # =========================================================
 
-def needs_search(text):
+def should_search(text):
 
     if not text:
         return False
 
-    text = text.lower()
-
-    words = [
+    keywords = [
         "ابحث",
         "ابحثلي",
         "ابحث لي",
         "دورلي",
         "دور لي",
         "على النت",
-        "من النت",
         "search",
         "google",
         "latest",
-        "recent",
         "today",
-        "now",
         "news",
         "weather",
         "price",
@@ -214,7 +250,6 @@ def needs_search(text):
         "الجو",
         "سعر",
         "أسعار",
-        "اسعار",
         "الدولار",
         "اليورو",
         "الذهب",
@@ -226,14 +261,19 @@ def needs_search(text):
         "دلوقتي",
         "دلوقت",
         "الآن",
-        "احدث",
         "أحدث",
+        "احدث",
     ]
 
-    return any(word in text for word in words)
+    text = text.lower()
+
+    return any(
+        word in text
+        for word in keywords
+    )
 
 
-def search_web(query):
+def web_search(query):
 
     try:
 
@@ -245,10 +285,10 @@ def search_web(query):
                 "no_html": "1",
                 "skip_disambig": "1",
             },
+            timeout=8,
             headers={
                 "User-Agent": "YosefAI/1.0"
             },
-            timeout=8,
         )
 
         if response.status_code != 200:
@@ -258,28 +298,36 @@ def search_web(query):
 
         results = []
 
-        abstract = data.get("AbstractText", "")
+        abstract = data.get(
+            "AbstractText",
+            ""
+        )
 
         if abstract:
             results.append(abstract)
 
-        for item in data.get("RelatedTopics", []):
+        for item in data.get(
+            "RelatedTopics",
+            []
+        ):
 
             if len(results) >= 5:
                 break
 
             if isinstance(item, dict):
 
-                text = item.get("Text", "")
+                text = item.get(
+                    "Text",
+                    ""
+                )
 
                 if text:
                     results.append(text)
 
-        return "\n\n".join(results)[:5000]
+        return "\n\n".join(results)[:6000]
 
     except Exception:
         return ""
-
 
 # =========================================================
 # قراءة الملفات
@@ -287,24 +335,21 @@ def search_web(query):
 
 def read_file(file):
 
-    if not file:
-        return ""
-
     try:
 
         data = file.getvalue()
 
         name = file.name.lower()
 
-
+        # TXT
         if name.endswith(".txt"):
 
             return data.decode(
                 "utf-8",
-                errors="ignore",
+                errors="ignore"
             )
 
-
+        # PDF
         if name.endswith(".pdf"):
 
             from pypdf import PdfReader
@@ -313,175 +358,143 @@ def read_file(file):
                 io.BytesIO(data)
             )
 
-            parts = []
+            text = []
 
             for page in reader.pages:
 
-                text = page.extract_text() or ""
+                page_text = (
+                    page.extract_text()
+                    or ""
+                )
 
-                if text:
-                    parts.append(text)
+                if page_text:
+                    text.append(page_text)
 
-            return "\n".join(parts)
+            return "\n".join(text)
 
-
+        # DOCX
         if name.endswith(".docx"):
 
             from docx import Document
 
-            document = Document(
+            doc = Document(
                 io.BytesIO(data)
             )
 
-            parts = []
+            text = []
 
-            for paragraph in document.paragraphs:
+            for paragraph in doc.paragraphs:
 
                 if paragraph.text:
-                    parts.append(paragraph.text)
+                    text.append(
+                        paragraph.text
+                    )
 
-            return "\n".join(parts)
+            return "\n".join(text)
 
+    except Exception as error:
 
-    except Exception:
-
-        return ""
+        return f"تعذر قراءة الملف: {error}"
 
     return ""
-
-
-# =========================================================
-# الصوت
-# =========================================================
-
-def audio_to_text(audio):
-
-    try:
-
-        recognizer = sr.Recognizer()
-
-        audio_buffer = io.BytesIO(
-            audio.getvalue()
-        )
-
-        with sr.AudioFile(audio_buffer) as source:
-
-            audio_data = recognizer.record(
-                source
-            )
-
-        return recognizer.recognize_google(
-            audio_data,
-            language="ar-EG",
-        )
-
-    except Exception:
-
-        return ""
-
 
 # =========================================================
 # تجهيز الرسائل
 # =========================================================
 
-def build_messages(
-    text,
-    extra_content=None,
+def create_messages(
+    user_text,
+    extra_content=None
 ):
 
     messages = [
         {
             "role": "system",
-            "content": SYSTEM_PROMPT,
+            "content": SYSTEM_PROMPT
         }
     ]
 
+    # ذاكرة آخر 8 رسائل
+    for message in st.session_state.messages[-8:]:
 
-    # آخر 6 رسائل فقط
-    for message in st.session_state.messages[-6:]:
+        messages.append({
+            "role": message["role"],
+            "content": message["content"]
+        })
 
-        messages.append(
-            {
-                "role": message["role"],
-                "content": message["content"],
-            }
+    content = []
+
+    content.append({
+        "type": "text",
+        "text": (
+            user_text
+            if user_text
+            else "حلل المحتوى المرفق."
         )
+    })
 
-
-    content = [
-        {
-            "type": "text",
-            "text": text or "حلل الملف أو الصورة المرفقة.",
-        }
-    ]
-
-
+    # صورة أو ملف
     if extra_content:
 
         content.extend(
             extra_content
         )
 
+    # بحث
+    if should_search(user_text):
 
-    # البحث
-    if needs_search(text):
-
-        result = search_web(text)
+        result = web_search(
+            user_text
+        )
 
         if result:
 
-            content.append(
-                {
-                    "type": "text",
-                    "text": (
-                        "معلومات من البحث:\n\n"
-                        + result
-                    ),
-                }
-            )
+            content.append({
+                "type": "text",
+                "text": (
+                    "هذه معلومات من البحث "
+                    "على الإنترنت، استخدمها "
+                    "كمعلومات مساعدة:\n\n"
+                    + result
+                )
+            })
 
-
-    messages.append(
-        {
-            "role": "user",
-            "content": content,
-        }
-    )
-
+    messages.append({
+        "role": "user",
+        "content": content
+    })
 
     return messages
 
-
 # =========================================================
-# الاتصال بـ OpenRouter
+# استدعاء الذكاء الاصطناعي
 # =========================================================
 
-def ask_yosef(
-    text,
-    extra_content=None,
+def ask_ai(
+    user_text,
+    extra_content=None
 ):
 
-    # سؤال المطور بدون API
-    if is_developer_question(text):
+    # إجابة المطور مباشرة
+    if developer_question(
+        user_text
+    ):
 
         return (
             "أنا Yosef AI، وتم تطويري بواسطة يوسف."
         )
 
-
-    messages = build_messages(
-        text,
-        extra_content,
+    messages = create_messages(
+        user_text,
+        extra_content
     )
 
-
     headers = {
-        "Authorization": (
-            "Bearer "
-            + OPENROUTER_KEY
-        ),
+        "Authorization":
+            f"Bearer {OPENROUTER_KEY}",
 
-        "Content-Type": "application/json",
+        "Content-Type":
+            "application/json",
 
         "HTTP-Referer":
             "https://openrouter.ai",
@@ -490,17 +503,12 @@ def ask_yosef(
             "Yosef AI",
     }
 
-
     payload = {
         "model": MODEL,
-
         "messages": messages,
-
-        "max_tokens": 700,
-
-        "temperature": 0.2,
+        "max_tokens": 1000,
+        "temperature": 0.3,
     }
-
 
     try:
 
@@ -511,73 +519,52 @@ def ask_yosef(
             timeout=90,
         )
 
-
-        # -----------------------------
-        # API key
-        # -----------------------------
-
+        # مفتاح خطأ
         if response.status_code == 401:
 
             return (
-                "❌ مفتاح OpenRouter غير صحيح. "
-                "راجع OPENROUTER_API_KEY في Secrets."
+                "❌ مفتاح OpenRouter غير صحيح."
             )
 
-
-        # -----------------------------
-        # Rate limit
-        # -----------------------------
-
+        # الحد
         if response.status_code == 429:
 
             return (
-                "⏳ OpenRouter وصل للحد المؤقت "
-                "للاستخدام المجاني. جرّب بعد شوية."
+                "⏳ تم الوصول للحد المؤقت "
+                "من OpenRouter. حاول مرة أخرى."
             )
 
-
-        # -----------------------------
-        # Server errors
-        # -----------------------------
-
+        # السيرفر
         if response.status_code >= 500:
 
             return (
                 "⏳ خادم الذكاء مشغول حاليًا. "
-                "جرّب إرسال الرسالة مرة ثانية."
+                "حاول مرة أخرى."
             )
 
-
-        # -----------------------------
-        # أي خطأ آخر
-        # -----------------------------
-
+        # أخطاء أخرى
         if response.status_code != 200:
 
             try:
 
-                error_data = response.json()
+                data = response.json()
 
-                error_message = (
-                    error_data
-                    .get("error", {})
-                    .get("message", "")
+                error = data.get(
+                    "error",
+                    {}
+                ).get(
+                    "message",
+                    ""
                 )
 
             except Exception:
 
-                error_message = response.text[:300]
-
+                error = response.text[:500]
 
             return (
-                "❌ حصل خطأ من OpenRouter:\n\n"
-                + str(error_message)
+                "❌ حصل خطأ:\n\n"
+                + str(error)
             )
-
-
-        # -----------------------------
-        # الرد
-        # -----------------------------
 
         data = response.json()
 
@@ -586,42 +573,35 @@ def ask_yosef(
             []
         )
 
-
         if not choices:
 
             return (
                 "❌ لم يصل رد من النموذج."
             )
 
-
-        message = choices[0].get(
-            "message",
-            {}
+        answer = (
+            choices[0]
+            .get("message", {})
+            .get("content", "")
         )
 
+        # بعض النماذج قد ترجع List
+        if isinstance(
+            answer,
+            list
+        ):
 
-        answer = message.get(
-            "content",
-            ""
-        )
-
-
-        if isinstance(answer, list):
-
-            parts = []
-
-            for item in answer:
-
-                if isinstance(item, dict):
-
-                    if item.get("type") == "text":
-
-                        parts.append(
-                            item.get("text", "")
-                        )
-
-            answer = "".join(parts)
-
+            answer = "".join(
+                item.get(
+                    "text",
+                    ""
+                )
+                for item in answer
+                if isinstance(
+                    item,
+                    dict
+                )
+            )
 
         if not answer:
 
@@ -629,49 +609,38 @@ def ask_yosef(
                 "❌ النموذج لم يُرجع نصًا."
             )
 
-
-        return str(answer).strip()
-
+        return str(
+            answer
+        ).strip()
 
     except requests.exceptions.Timeout:
 
         return (
-            "⏳ الاتصال أخذ وقتًا طويلًا. "
-            "جرّب مرة ثانية."
+            "⏳ الاتصال استغرق وقتًا طويلًا. "
+            "حاول مرة أخرى."
         )
-
 
     except requests.exceptions.ConnectionError:
 
         return (
-            "❌ تعذر الاتصال بـ OpenRouter. "
-            "تأكد من الإنترنت ثم جرّب مرة ثانية."
+            "❌ لا يمكن الاتصال بالخادم. "
+            "تأكد من الإنترنت."
         )
-
 
     except Exception as error:
 
         return (
-            "❌ حصل خطأ أثناء تشغيل Yosef AI:\n\n"
+            "❌ حصل خطأ:\n\n"
             + str(error)[:500]
         )
 
-
 # =========================================================
-# عرض المحادثة القديمة
+# المحادثة القديمة
 # =========================================================
 
 for message in st.session_state.messages:
 
-    role = message.get(
-        "role",
-        "assistant",
-    )
-
-    content = message.get(
-        "content",
-        "",
-    )
+    role = message["role"]
 
     with st.chat_message(
         role,
@@ -679,11 +648,12 @@ for message in st.session_state.messages:
             "👤"
             if role == "user"
             else "🤖"
-        ),
+        )
     ):
 
-        st.markdown(content)
-
+        st.markdown(
+            message["content"]
+        )
 
 # =========================================================
 # الأزرار
@@ -691,34 +661,92 @@ for message in st.session_state.messages:
 
 col1, col2 = st.columns(2)
 
-
 with col1:
 
     if st.button(
         "🆕 محادثة جديدة",
-        use_container_width=True,
+        use_container_width=True
     ):
 
         st.session_state.messages = []
 
-        st.rerun()
+        st.session_state.message_count = 0
 
+        st.rerun()
 
 with col2:
 
-    st.info(
-        "🤖 الشات جاهز"
-    )
+    if st.session_state.plan == "Free":
 
+        st.info(
+            f"🆓 {max(FREE_LIMIT - st.session_state.message_count, 0)} رسالة"
+        )
+
+    else:
+
+        st.success(
+            "⭐ Pro"
+        )
 
 # =========================================================
-# خانة الرسالة
+# Pro
+# =========================================================
+
+with st.expander("⭐ الترقية إلى Yosef AI Pro"):
+
+    st.write(
+        "احصل على استخدام أكبر ومميزات إضافية."
+    )
+
+    if PRO_PAYMENT_URL:
+
+        st.link_button(
+            "💳 اشترك في Pro",
+            PRO_PAYMENT_URL,
+            use_container_width=True
+        )
+
+    else:
+
+        st.info(
+            "رابط الدفع غير مضاف حاليًا."
+        )
+
+    if PRO_CODE:
+
+        code = st.text_input(
+            "كود Pro",
+            type="password"
+        )
+
+        if st.button(
+            "تفعيل Pro",
+            use_container_width=True
+        ):
+
+            if code == PRO_CODE:
+
+                st.session_state.plan = "Pro"
+
+                st.success(
+                    "✅ تم تفعيل Pro."
+                )
+
+                st.rerun()
+
+            else:
+
+                st.error(
+                    "❌ الكود غير صحيح."
+                )
+
+# =========================================================
+# الإدخال
 # =========================================================
 
 prompt = st.chat_input(
     "اكتب رسالتك...",
     accept_file=True,
-    accept_audio=True,
     file_type=[
         "png",
         "jpg",
@@ -730,215 +758,185 @@ prompt = st.chat_input(
     ],
 )
 
-
 # =========================================================
-# معالجة الرسالة
+# تنفيذ الرسالة
 # =========================================================
 
 if prompt:
 
-    try:
+    # Free limit
+    if (
+        st.session_state.plan == "Free"
+        and
+        st.session_state.message_count
+        >= FREE_LIMIT
+    ):
 
-        text = prompt.text or ""
+        st.warning(
+            "🆓 خلصت رسائلك المجانية."
+        )
 
-        uploaded_file = None
+        if PRO_PAYMENT_URL:
 
-
-        # الملف
-        if prompt.files:
-
-            uploaded_file = prompt.files[0]
-
-
-        # الصوت
-        if prompt.audio:
-
-            spoken_text = audio_to_text(
-                prompt.audio
+            st.link_button(
+                "⭐ الترقية إلى Pro",
+                PRO_PAYMENT_URL,
+                use_container_width=True
             )
 
-            if spoken_text:
+        st.stop()
 
-                text = spoken_text
+    user_text = (
+        prompt.text
+        or ""
+    )
 
-            else:
+    uploaded_file = None
 
-                st.error(
-                    "❌ مش قادر أفهم التسجيل الصوتي."
-                )
+    if prompt.files:
 
-                st.stop()
+        uploaded_file = (
+            prompt.files[0]
+        )
 
+    extra_content = []
 
-        if not text and not uploaded_file:
+    # =====================================================
+    # الصورة / الملف
+    # =====================================================
 
-            st.warning(
-                "اكتب رسالة أو أرفق صورة/ملف."
-            )
+    if uploaded_file:
 
-            st.stop()
+        file_type = (
+            uploaded_file.type
+            or ""
+        )
 
-
-        extra_content = []
-
-
-        # =================================================
         # صورة
-        # =================================================
+        if file_type.startswith(
+            "image/"
+        ):
+
+            image_data = (
+                uploaded_file
+                .getvalue()
+            )
+
+            encoded = base64.b64encode(
+                image_data
+            ).decode(
+                "utf-8"
+            )
+
+            extra_content.append({
+
+                "type":
+                    "image_url",
+
+                "image_url": {
+
+                    "url":
+                        f"data:{file_type};base64,{encoded}"
+                }
+            })
+
+        # ملف
+        else:
+
+            file_text = read_file(
+                uploaded_file
+            )
+
+            if file_text:
+
+                extra_content.append({
+
+                    "type":
+                        "text",
+
+                    "text":
+                        "محتوى الملف:\n\n"
+                        + file_text[:20000]
+                })
+
+    # =====================================================
+    # عرض المستخدم
+    # =====================================================
+
+    with st.chat_message(
+        "user",
+        avatar="👤"
+    ):
+
+        if user_text:
+
+            st.markdown(
+                user_text
+            )
 
         if uploaded_file:
 
-            file_type = (
-                uploaded_file.type or ""
-            )
-
-
-            if file_type.startswith(
-                "image/"
+            if (
+                uploaded_file.type
+                and
+                uploaded_file.type.startswith(
+                    "image/"
+                )
             ):
 
-                image_bytes = (
-                    uploaded_file.getvalue()
-                )
-
-                encoded = base64.b64encode(
-                    image_bytes
-                ).decode("utf-8")
-
-
-                extra_content.append(
-                    {
-                        "type": "image_url",
-
-                        "image_url": {
-                            "url": (
-                                "data:"
-                                + file_type
-                                + ";base64,"
-                                + encoded
-                            )
-                        },
-                    }
-                )
-
-
-            # =================================================
-            # ملف
-            # =================================================
-
-            else:
-
-                file_text = read_file(
+                st.image(
                     uploaded_file
                 )
 
-                if file_text:
+            else:
 
-                    extra_content.append(
-                        {
-                            "type": "text",
-
-                            "text": (
-                                "محتوى الملف:\n\n"
-                                + file_text[:16000]
-                            ),
-                        }
-                    )
-
-                else:
-
-                    extra_content.append(
-                        {
-                            "type": "text",
-
-                            "text": (
-                                "اسم الملف: "
-                                + uploaded_file.name
-                            ),
-                        }
-                    )
-
-
-        # =================================================
-        # رسالة المستخدم
-        # =================================================
-
-        with st.chat_message(
-            "user",
-            avatar="👤",
-        ):
-
-            if text:
-
-                st.markdown(text)
-
-
-            if uploaded_file:
-
-                if (
-                    uploaded_file.type
-                    and uploaded_file.type.startswith(
-                        "image/"
-                    )
-                ):
-
-                    st.image(
-                        uploaded_file
-                    )
-
-                else:
-
-                    st.caption(
-                        "📎 "
-                        + uploaded_file.name
-                    )
-
-
-        # =================================================
-        # رد Yosef
-        # =================================================
-
-        with st.chat_message(
-            "assistant",
-            avatar="🤖",
-        ):
-
-            with st.spinner(
-                "🤖 Yosef AI بيكتب..."
-            ):
-
-                answer = ask_yosef(
-                    text,
-                    extra_content,
+                st.caption(
+                    "📎 "
+                    + uploaded_file.name
                 )
 
+    # =====================================================
+    # الرد
+    # =====================================================
 
-            st.markdown(answer)
+    with st.chat_message(
+        "assistant",
+        avatar="🤖"
+    ):
 
+        with st.spinner(
+            "🤖 Yosef AI بيكتب..."
+        ):
 
-        # =================================================
-        # حفظ
-        # =================================================
+            answer = ask_ai(
+                user_text,
+                extra_content
+            )
 
-        st.session_state.messages.append(
-            {
-                "role": "user",
-                "content": text,
-            }
+        st.markdown(
+            answer
         )
 
+    # =====================================================
+    # حفظ
+    # =====================================================
 
-        st.session_state.messages.append(
-            {
-                "role": "assistant",
-                "content": answer,
-            }
-        )
+    st.session_state.messages.append({
 
+        "role":
+            "user",
 
-    except Exception as error:
+        "content":
+            user_text
+    })
 
-        st.error(
-            "❌ حصل خطأ: "
-            + str(error)
-    )
+    st.session_state.messages.append({
+
+        "role":
+            "assistant",
+
+        "content":
+            answer
+    })
+
+    st.session_state.message_count += 1

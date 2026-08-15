@@ -2,6 +2,5 @@ streamlit
 openai
 requests
 SpeechRecognition
-streamlit-webrtc
-av
-numpy
+pypdf
+python-docx

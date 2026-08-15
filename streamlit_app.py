@@ -2,6 +2,7 @@ import streamlit as st
 from openai import OpenAI
 import base64
 import io
+import json
 import requests
 import speech_recognition as sr
 
@@ -19,25 +20,31 @@ st.set_page_config(
 
 
 # =========================================================
-# OpenRouter
+# مفاتيح API
 # =========================================================
 
-api_key = st.secrets.get("OPENROUTER_API_KEY")
+openrouter_key = st.secrets.get("OPENROUTER_API_KEY")
+openai_key = st.secrets.get("OPENAI_API_KEY")
 
-if not api_key:
+
+# =========================================================
+# OpenRouter - الشات العادي
+# =========================================================
+
+if not openrouter_key:
     st.error("❌ OPENROUTER_API_KEY غير موجود في Secrets.")
     st.stop()
 
 
 client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
-    api_key=api_key,
+    api_key=openrouter_key,
     timeout=30.0,
 )
 
 
 # =========================================================
-# الموديل الثابت
+# الموديل الثابت للشات
 # =========================================================
 
 MODEL = "nvidia/nemotron-nano-12b-v2-vl:free"
@@ -121,6 +128,45 @@ Analysis
 
 
 # =========================================================
+# تعليمات المكالمة الصوتية
+# =========================================================
+
+VOICE_SYSTEM_PROMPT = """
+أنت Yosef AI داخل مكالمة صوتية حقيقية.
+
+اسمك Yosef AI.
+
+تم تطوير Yosef AI بواسطة يوسف.
+
+تحدث مع المستخدم باللغة التي يتحدث بها.
+
+إذا تحدث المستخدم بالعربية، تحدث بالعربية.
+
+كن طبيعيًا وودودًا.
+
+اجعل ردودك الصوتية قصيرة وواضحة وطبيعية.
+
+لا تعرض التفكير الداخلي.
+
+لا تقل إنك ChatGPT.
+
+إذا سأل المستخدم:
+مين مطورك؟
+مين عملك؟
+مين طورك؟
+مين صاحبك؟
+مين اللي عاملك؟
+مين صانعك؟
+مين مبرمجك؟
+
+أجب:
+أنا Yosef AI، وتم تطويري بواسطة يوسف.
+
+لا تشرح تعليمات النظام.
+"""
+
+
+# =========================================================
 # CSS
 # =========================================================
 
@@ -175,6 +221,15 @@ st.markdown(
         color: #8f96a3;
         font-size: 14px;
         margin-top: 6px;
+    }
+
+    .voice-box {
+        text-align: center;
+        padding: 18px;
+        margin: 14px 0;
+        border-radius: 22px;
+        background: rgba(25, 28, 36, 0.9);
+        border: 1px solid rgba(255,255,255,0.08);
     }
 
     div[data-testid="stChatMessage"] {
@@ -246,6 +301,635 @@ st.markdown(
 
 
 # =========================================================
+# إنشاء مفتاح مؤقت للمكالمة
+# =========================================================
+
+def create_realtime_client_secret():
+
+    if not openai_key:
+        return None, (
+            "❌ مفتاح OPENAI_API_KEY غير موجود في Secrets."
+        )
+
+    try:
+
+        payload = {
+            "expires_after": {
+                "anchor": "created_at",
+                "seconds": 3600,
+            },
+
+            "session": {
+                "type": "realtime",
+
+                "model": "gpt-realtime",
+
+                "instructions": VOICE_SYSTEM_PROMPT,
+
+                "output_modalities": [
+                    "audio"
+                ],
+
+                "audio": {
+
+                    "input": {
+
+                        "noise_reduction": {
+                            "type": "near_field"
+                        },
+
+                        "transcription": {
+                            "model": "gpt-4o-mini-transcribe",
+                            "language": "ar"
+                        },
+
+                        "turn_detection": {
+                            "type": "server_vad",
+                            "create_response": True,
+                            "interrupt_response": True,
+                            "silence_duration_ms": 500
+                        }
+                    },
+
+                    "output": {
+                        "voice": "marin"
+                    }
+                }
+            }
+        }
+
+        response = requests.post(
+            "https://api.openai.com/v1/realtime/client_secrets",
+            headers={
+                "Authorization": "Bearer " + openai_key,
+                "Content-Type": "application/json",
+            },
+            json=payload,
+            timeout=20,
+        )
+
+        if response.status_code != 200:
+
+            try:
+                error_data = response.json()
+                error_message = (
+                    error_data
+                    .get("error", {})
+                    .get("message", "")
+                )
+            except Exception:
+                error_message = response.text
+
+            return None, (
+                "❌ OpenAI رفض إنشاء جلسة الصوت.\n\n"
+                + str(error_message)[:500]
+            )
+
+        data = response.json()
+
+        # الشكل الحالي للـ GA API
+        token = data.get("value")
+
+        # توافق احتياطي مع بعض الاستجابات القديمة
+        if not token:
+
+            client_secret = data.get(
+                "client_secret",
+                {}
+            )
+
+            if isinstance(
+                client_secret,
+                dict
+            ):
+
+                token = client_secret.get(
+                    "value"
+                )
+
+        if not token:
+
+            return None, (
+                "❌ تم إنشاء الجلسة لكن لم يصل مفتاح الصوت المؤقت."
+            )
+
+        return token, None
+
+    except Exception as error:
+
+        return None, (
+            "❌ حصل خطأ أثناء تجهيز المكالمة: "
+            + str(error)[:500]
+        )
+
+
+# =========================================================
+# واجهة المكالمة الصوتية الحقيقية
+# =========================================================
+
+def render_voice_call(client_secret):
+
+    if not client_secret:
+        return
+
+    token_json = json.dumps(
+        client_secret
+    )
+
+    voice_html = f"""
+    <!DOCTYPE html>
+
+    <html lang="ar" dir="rtl">
+
+    <head>
+
+        <meta charset="UTF-8">
+
+        <style>
+
+            * {{
+                box-sizing: border-box;
+            }}
+
+            body {{
+                margin: 0;
+                padding: 8px;
+                background: transparent;
+                font-family: Arial, sans-serif;
+            }}
+
+            .voice-card {{
+                width: 100%;
+                padding: 20px;
+                border-radius: 22px;
+                background: #191c24;
+                border: 1px solid rgba(255,255,255,0.08);
+                text-align: center;
+            }}
+
+            .orb {{
+                width: 86px;
+                height: 86px;
+                margin: 0 auto 14px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 40px;
+                background: #242936;
+                border: 2px solid #454b5b;
+                transition: 0.25s;
+            }}
+
+            .orb.active {{
+                animation: pulse 1.4s infinite;
+                border-color: #6c63ff;
+            }}
+
+            @keyframes pulse {{
+                0% {{
+                    transform: scale(1);
+                    box-shadow: 0 0 0 0 rgba(108,99,255,.4);
+                }}
+
+                70% {{
+                    transform: scale(1.06);
+                    box-shadow: 0 0 0 18px rgba(108,99,255,0);
+                }}
+
+                100% {{
+                    transform: scale(1);
+                    box-shadow: 0 0 0 0 rgba(108,99,255,0);
+                }}
+            }}
+
+            .title {{
+                color: white;
+                font-size: 19px;
+                font-weight: 700;
+                margin-bottom: 6px;
+            }}
+
+            .status {{
+                color: #9aa1af;
+                font-size: 14px;
+                min-height: 22px;
+                margin-bottom: 14px;
+            }}
+
+            button {{
+                width: 100%;
+                border: 0;
+                border-radius: 15px;
+                padding: 13px 18px;
+                font-size: 16px;
+                font-weight: 700;
+                cursor: pointer;
+                background: #343946;
+                color: white;
+            }}
+
+            button.start {{
+                background: #6c63ff;
+            }}
+
+            button.stop {{
+                background: #a83246;
+            }}
+
+            button:disabled {{
+                opacity: .55;
+                cursor: not-allowed;
+            }}
+
+            audio {{
+                display: none;
+            }}
+
+        </style>
+
+    </head>
+
+    <body>
+
+        <div class="voice-card">
+
+            <div id="orb" class="orb">
+                🎙️
+            </div>
+
+            <div class="title">
+                مكالمة Yosef AI
+            </div>
+
+            <div id="status" class="status">
+                اضغط لبدء المكالمة
+            </div>
+
+            <button
+                id="callButton"
+                class="start"
+            >
+                📞 بدء المكالمة
+            </button>
+
+            <audio
+                id="remoteAudio"
+                autoplay
+            ></audio>
+
+        </div>
+
+
+        <script>
+
+            const TOKEN = {token_json};
+
+            let peerConnection = null;
+            let dataChannel = null;
+            let localStream = null;
+
+            const button =
+                document.getElementById("callButton");
+
+            const status =
+                document.getElementById("status");
+
+            const orb =
+                document.getElementById("orb");
+
+            const audio =
+                document.getElementById("remoteAudio");
+
+
+            function setStatus(text) {{
+                status.textContent = text;
+            }}
+
+
+            async function startCall() {{
+
+                try {{
+
+                    button.disabled = true;
+
+                    setStatus(
+                        "🔐 جاري الاتصال بـ Yosef AI..."
+                    );
+
+
+                    if (
+                        !navigator.mediaDevices ||
+                        !navigator.mediaDevices.getUserMedia
+                    ) {{
+
+                        throw new Error(
+                            "المتصفح لا يسمح باستخدام الميكروفون."
+                        );
+
+                    }}
+
+
+                    localStream =
+                        await navigator.mediaDevices.getUserMedia(
+                            {{
+                                audio: true
+                            }}
+                        );
+
+
+                    peerConnection =
+                        new RTCPeerConnection();
+
+
+                    peerConnection.ontrack =
+                        function(event) {{
+
+                            audio.srcObject =
+                                event.streams[0];
+
+                            audio.play().catch(
+                                function() {{}}
+                            );
+
+                        }};
+
+
+                    localStream
+                        .getTracks()
+                        .forEach(
+                            function(track) {{
+
+                                peerConnection.addTrack(
+                                    track,
+                                    localStream
+                                );
+
+                            }}
+                        );
+
+
+                    dataChannel =
+                        peerConnection.createDataChannel(
+                            "oai-events"
+                        );
+
+
+                    dataChannel.onopen =
+                        function() {{
+
+                            setStatus(
+                                "🟢 المكالمة شغالة — اتكلم براحتك"
+                            );
+
+                            orb.classList.add(
+                                "active"
+                            );
+
+                            button.textContent =
+                                "📴 إنهاء المكالمة";
+
+                            button.className =
+                                "stop";
+
+                            button.disabled =
+                                false;
+
+                        }};
+
+
+                    dataChannel.onmessage =
+                        function(event) {{
+
+                            try {{
+
+                                const message =
+                                    JSON.parse(
+                                        event.data
+                                    );
+
+
+                                if (
+                                    message.type ===
+                                    "input_audio_buffer.speech_started"
+                                ) {{
+
+                                    setStatus(
+                                        "🎤 سامعك..."
+                                    );
+
+                                }}
+
+
+                                else if (
+                                    message.type ===
+                                    "response.created"
+                                ) {{
+
+                                    setStatus(
+                                        "🤖 Yosef AI بيرد..."
+                                    );
+
+                                }}
+
+
+                                else if (
+                                    message.type ===
+                                    "response.done"
+                                ) {{
+
+                                    setStatus(
+                                        "🟢 المكالمة شغالة — اتكلم براحتك"
+                                    );
+
+                                }}
+
+                            }}
+                            catch (e) {{}}
+
+                        }};
+
+
+                    const offer =
+                        await peerConnection.createOffer();
+
+
+                    await peerConnection.setLocalDescription(
+                        offer
+                    );
+
+
+                    setStatus(
+                        "🔗 جاري فتح المكالمة..."
+                    );
+
+
+                    const response =
+                        await fetch(
+                            "https://api.openai.com/v1/realtime/calls",
+                            {{
+                                method: "POST",
+
+                                headers: {{
+                                    "Authorization":
+                                        "Bearer " + TOKEN,
+
+                                    "Content-Type":
+                                        "application/sdp"
+                                }},
+
+                                body:
+                                    offer.sdp
+                            }}
+                        );
+
+
+                    if (!response.ok) {{
+
+                        const errorText =
+                            await response.text();
+
+                        throw new Error(
+                            "فشل اتصال WebRTC: "
+                            + errorText
+                        );
+
+                    }}
+
+
+                    const answerSdp =
+                        await response.text();
+
+
+                    await peerConnection.setRemoteDescription(
+                        {{
+                            type: "answer",
+                            sdp: answerSdp
+                        }}
+                    );
+
+
+                }}
+                catch (error) {{
+
+                    console.error(error);
+
+                    setStatus(
+                        "❌ " + error.message
+                    );
+
+                    await stopCall();
+
+                }}
+
+            }}
+
+
+            async function stopCall() {{
+
+                try {{
+
+                    if (localStream) {{
+
+                        localStream
+                            .getTracks()
+                            .forEach(
+                                function(track) {{
+                                    track.stop();
+                                }}
+                            );
+
+                        localStream = null;
+
+                    }}
+
+
+                    if (dataChannel) {{
+
+                        try {{
+                            dataChannel.close();
+                        }}
+                        catch (e) {{}}
+
+                        dataChannel = null;
+
+                    }}
+
+
+                    if (peerConnection) {{
+
+                        try {{
+                            peerConnection.close();
+                        }}
+                        catch (e) {{}}
+
+                        peerConnection = null;
+
+                    }}
+
+
+                    audio.srcObject = null;
+
+                    orb.classList.remove(
+                        "active"
+                    );
+
+                    button.textContent =
+                        "📞 بدء المكالمة";
+
+                    button.className =
+                        "start";
+
+                    button.disabled =
+                        false;
+
+                    setStatus(
+                        "تم إنهاء المكالمة"
+                    );
+
+                }}
+                catch (error) {{
+
+                    console.error(error);
+
+                }}
+
+            }}
+
+
+            button.addEventListener(
+                "click",
+                async function() {{
+
+                    if (peerConnection) {{
+
+                        await stopCall();
+
+                    }}
+                    else {{
+
+                        await startCall();
+
+                    }}
+
+                }}
+            );
+
+        </script>
+
+    </body>
+
+    </html>
+    """
+
+    st.components.v1.html(
+        voice_html,
+        height=260,
+        scrolling=False,
+    )
+
+
+# =========================================================
 # أزرار التحكم
 # =========================================================
 
@@ -261,6 +945,7 @@ with col1:
     ):
 
         st.session_state.messages = []
+
         st.session_state.voice_mode = False
 
         st.rerun()
@@ -268,15 +953,17 @@ with col1:
 
 with col2:
 
-    # مهم جدًا:
-    # الـ key مختلف عن اسم session_state
     if st.session_state.voice_mode:
 
-        voice_button_text = "🔴 إيقاف وضع المكالمة"
+        voice_button_text = (
+            "🔴 إغلاق المكالمة"
+        )
 
     else:
 
-        voice_button_text = "🎙️ تشغيل وضع المكالمة"
+        voice_button_text = (
+            "🎙️ تشغيل المكالمة"
+        )
 
 
     if st.button(
@@ -293,15 +980,51 @@ with col2:
 
 
 # =========================================================
-# حالة المكالمة
+# تشغيل المكالمة
 # =========================================================
 
 if st.session_state.voice_mode:
 
-    st.info(
-        "🎙️ وضع المكالمة الصوتية مفعل — "
-        "سجل صوتك من خانة الصوت الموجودة بالأسفل."
+    st.markdown(
+        """
+        <div class="voice-box">
+            <b>🎙️ مكالمة Yosef AI</b><br>
+            <span style="color:#8f96a3;">
+                اضغط "بدء المكالمة" وتكلم مباشرة.
+            </span>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
+
+    if not openai_key:
+
+        st.error(
+            "❌ أضف OPENAI_API_KEY في Secrets لتشغيل المكالمة."
+        )
+
+    else:
+
+        with st.spinner(
+            "🔐 تجهيز الاتصال الصوتي..."
+        ):
+
+            realtime_token, realtime_error = (
+                create_realtime_client_secret()
+            )
+
+
+        if realtime_error:
+
+            st.error(
+                realtime_error
+            )
+
+        else:
+
+            render_voice_call(
+                realtime_token
+            )
 
 
 # =========================================================
@@ -313,13 +1036,16 @@ if not st.session_state.messages:
     st.markdown(
         """
         <div class="welcome-box">
+
             <div class="welcome-title">
                 👋 أهلاً بيك في Yosef AI
             </div>
+
             <div class="welcome-text">
                 اكتب سؤالك أو استخدم + لإضافة صورة أو ملف.
-                ويمكنك استخدام الصوت أيضًا.
+                ويمكنك استخدام المكالمة الصوتية أيضًا.
             </div>
+
         </div>
         """,
         unsafe_allow_html=True,
@@ -360,12 +1086,10 @@ def is_developer_question(text):
         "who is your developer",
     ]
 
-    for word in developer_words:
-
-        if word in text_lower:
-            return True
-
-    return False
+    return any(
+        word in text_lower
+        for word in developer_words
+    )
 
 
 # =========================================================
@@ -477,7 +1201,6 @@ def search_web(query):
         )
 
         if abstract:
-
             results.append(
                 abstract
             )
@@ -504,7 +1227,6 @@ def search_web(query):
             )
 
             if item_text:
-
                 results.append(
                     item_text
                 )
@@ -535,14 +1257,12 @@ def read_file(file):
             file.name or ""
         ).lower()
 
-
         if name.endswith(".txt"):
 
             return data.decode(
                 "utf-8",
                 errors="ignore",
             )
-
 
         if name.endswith(".pdf"):
 
@@ -568,7 +1288,6 @@ def read_file(file):
                     )
 
             return "\n".join(parts)
-
 
         if name.endswith(".docx"):
 
@@ -598,7 +1317,7 @@ def read_file(file):
 
 
 # =========================================================
-# تحويل الصوت إلى نص
+# تحويل الصوت القديم إلى نص
 # =========================================================
 
 def audio_to_text(audio):
@@ -656,7 +1375,9 @@ def clean_answer(answer):
 
     for phrase in forbidden_phrases:
 
-        if answer.startswith(phrase):
+        if answer.startswith(
+            phrase
+        ):
 
             answer = answer[
                 len(phrase):
@@ -681,13 +1402,11 @@ def build_messages(
         }
     ]
 
-
     if extra_content:
 
         content.extend(
             extra_content
         )
-
 
     if needs_search(text):
 
@@ -707,7 +1426,6 @@ def build_messages(
                 }
             )
 
-
     messages = [
         {
             "role": "system",
@@ -715,8 +1433,6 @@ def build_messages(
         }
     ]
 
-
-    # ذاكرة قصيرة لتسريع الطلب
     for message in st.session_state.messages[-6:]:
 
         messages.append(
@@ -726,14 +1442,12 @@ def build_messages(
             }
         )
 
-
     messages.append(
         {
             "role": "user",
             "content": content,
         }
     )
-
 
     return messages
 
@@ -747,19 +1461,16 @@ def ask_yosef_stream(
     extra_content=None,
 ):
 
-    # سؤال المطور لا يحتاج API
     if is_developer_question(text):
 
         return [
             "أنا Yosef AI، وتم تطويري بواسطة يوسف."
         ]
 
-
     messages = build_messages(
         text,
         extra_content,
     )
-
 
     try:
 
@@ -773,11 +1484,9 @@ def ask_yosef_stream(
 
         return stream
 
-
     except Exception as error:
 
         error_text = str(error)
-
 
         if (
             "429" in error_text
@@ -790,7 +1499,6 @@ def ask_yosef_stream(
             )
 
             return None
-
 
         if (
             "model" in error_text.lower()
@@ -805,7 +1513,6 @@ def ask_yosef_stream(
             )
 
             return None
-
 
         st.error(
             "❌ حصل خطأ أثناء تشغيل Yosef AI."
@@ -882,7 +1589,6 @@ if prompt:
 
         uploaded_file = None
 
-
         # -------------------------------------------------
         # الملف
         # -------------------------------------------------
@@ -893,9 +1599,8 @@ if prompt:
                 prompt.files[0]
             )
 
-
         # -------------------------------------------------
-        # الصوت
+        # الصوت القديم
         # -------------------------------------------------
 
         if prompt.audio:
@@ -914,9 +1619,8 @@ if prompt:
 
             text = spoken_text
 
-
         # -------------------------------------------------
-        # التأكد من وجود محتوى
+        # التأكد
         # -------------------------------------------------
 
         if (
@@ -930,13 +1634,11 @@ if prompt:
 
             st.stop()
 
-
         # -------------------------------------------------
-        # تجهيز المحتوى الإضافي
+        # المحتوى الإضافي
         # -------------------------------------------------
 
         extra_content = []
-
 
         if uploaded_file:
 
@@ -944,11 +1646,7 @@ if prompt:
                 uploaded_file.type or ""
             )
 
-
-            # =============================
             # صورة
-            # =============================
-
             if file_type.startswith(
                 "image/"
             ):
@@ -977,11 +1675,7 @@ if prompt:
                     }
                 )
 
-
-            # =============================
             # ملف
-            # =============================
-
             else:
 
                 file_text = read_file(
@@ -1012,7 +1706,6 @@ if prompt:
                         }
                     )
 
-
         # -------------------------------------------------
         # رسالة المستخدم
         # -------------------------------------------------
@@ -1028,13 +1721,11 @@ if prompt:
                     text
                 )
 
-
             if uploaded_file:
 
                 file_type = (
                     uploaded_file.type or ""
                 )
-
 
                 if file_type.startswith(
                     "image/"
@@ -1050,7 +1741,6 @@ if prompt:
                         "📎 "
                         + uploaded_file.name
                     )
-
 
         # -------------------------------------------------
         # رد Yosef
@@ -1069,20 +1759,16 @@ if prompt:
 
             placeholder = st.empty()
 
-
             stream_response = ask_yosef_stream(
                 text,
                 extra_content,
             )
 
-
             if stream_response is None:
 
                 st.stop()
 
-
             full_answer = ""
-
 
             try:
 
@@ -1100,16 +1786,13 @@ if prompt:
                         full_answer
                     )
 
-
                 # Streaming
                 else:
 
                     for chunk in stream_response:
 
                         if not chunk.choices:
-
                             continue
-
 
                         delta = (
                             chunk
@@ -1117,12 +1800,10 @@ if prompt:
                             .delta
                         )
 
-
                         piece = (
                             delta.content
                             or ""
                         )
-
 
                         if piece:
 
@@ -1131,7 +1812,6 @@ if prompt:
                             placeholder.markdown(
                                 full_answer
                             )
-
 
             except Exception as stream_error:
 
@@ -1147,9 +1827,7 @@ if prompt:
 
                     st.stop()
 
-
             status.empty()
-
 
             if not full_answer:
 
@@ -1159,16 +1837,13 @@ if prompt:
 
                 st.stop()
 
-
             full_answer = clean_answer(
                 full_answer
             )
 
-
             placeholder.markdown(
                 full_answer
             )
-
 
         # -------------------------------------------------
         # حفظ المحادثة
@@ -1181,7 +1856,6 @@ if prompt:
             }
         )
 
-
         st.session_state.messages.append(
             {
                 "role": "assistant",
@@ -1189,10 +1863,9 @@ if prompt:
             }
         )
 
-
     except Exception as error:
 
         st.error(
             "❌ حصل خطأ: "
             + str(error)
-    )
+        )

@@ -7,10 +7,6 @@ import re
 import speech_recognition as sr
 
 
-# =========================================================
-# إعداد الصفحة
-# =========================================================
-
 st.set_page_config(
     page_title="Yosef AI",
     page_icon="🤖",
@@ -22,14 +18,18 @@ st.set_page_config(
 # OpenRouter
 # =========================================================
 
-api_key = st.secrets["OPENROUTER_API_KEY"]
+api_key = st.secrets.get("OPENROUTER_API_KEY")
+
+if not api_key:
+    st.error("❌ OPENROUTER_API_KEY غير موجود في Secrets.")
+    st.stop()
 
 client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
     api_key=api_key
 )
 
-MODEL_NAME = st.secrets.get(
+MODEL = st.secrets.get(
     "OPENROUTER_MODEL",
     "openrouter/free"
 )
@@ -42,9 +42,6 @@ MODEL_NAME = st.secrets.get(
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-if "voice_mode" not in st.session_state:
-    st.session_state.voice_mode = False
-
 
 # =========================================================
 # تعليمات Yosef AI
@@ -55,24 +52,31 @@ SYSTEM_PROMPT = """
 
 اسمك Yosef AI.
 
-إذا سأل المستخدم: من طورك؟ أو مين عملك؟
-قل إن التطبيق تم تطويره بواسطة يوسف، صاحب ومطور Yosef AI.
+إذا سأل المستخدم:
+من طورك؟
+من عملك؟
+مين مطورك؟
 
-لا تقل إنك ChatGPT أو المساعد الرسمي لـ OpenAI.
+قل:
+تم تطوير Yosef AI بواسطة يوسف.
+
+لا تقل إنك ChatGPT.
 
 أجب باللغة التي يستخدمها المستخدم.
 
 كن طبيعيًا وودودًا ومفيدًا.
 
-مهم جدًا:
-- لا تعرض خطوات التفكير الداخلية.
-- لا تعرض التحليل الداخلي.
-- لا تقل: Here's a thinking process.
-- أعط الإجابة النهائية فقط.
-- إذا كانت هناك معلومات من البحث، استخدمها بحذر.
-- لا تخترع معلومات غير موجودة.
-- إذا أرسل المستخدم صورة، حلل فقط ما يظهر فيها بوضوح.
-- إذا أرسل المستخدم ملفًا، استخدم المحتوى المتاح منه فقط.
+لا تعرض خطوات التفكير الداخلية أو التحليل الداخلي.
+أعط الإجابة النهائية فقط.
+
+إذا أرسل المستخدم صورة:
+حلل ما يظهر بوضوح فقط ولا تخترع تفاصيل.
+
+إذا أرسل المستخدم ملفًا:
+استخدم المعلومات المتاحة منه فقط.
+
+إذا تم إعطاؤك معلومات من البحث:
+استخدم المعلومات الموجودة ولا تخترع معلومات.
 """
 
 
@@ -88,15 +92,14 @@ st.markdown(
         text-align: center;
         font-size: 34px;
         font-weight: 700;
-        margin-top: 15px;
-        margin-bottom: 5px;
+        margin-top: 20px;
     }
 
     .yosef-subtitle {
         text-align: center;
         color: #777;
-        margin-bottom: 20px;
         font-size: 16px;
+        margin-bottom: 20px;
     }
 
     </style>
@@ -129,12 +132,10 @@ st.markdown(
 
 if st.button(
     "🆕 محادثة جديدة",
-    use_container_width=True,
-    key="new_chat"
+    use_container_width=True
 ):
 
     st.session_state.messages = []
-    st.session_state.voice_mode = False
 
     st.rerun()
 
@@ -148,78 +149,49 @@ def needs_web_search(text):
     if not text:
         return False
 
-    text_lower = text.lower()
-
-    keywords = [
+    words = [
         "ابحث",
         "ابحثلي",
         "ابحث لي",
         "دورلي",
         "دور لي",
-        "شوفلي",
-        "شوف لي",
         "على النت",
         "على الإنترنت",
-        "من الإنترنت",
-
         "الطقس",
         "الجو",
         "درجة الحرارة",
-
         "أخبار",
         "اخبار",
         "خبر",
-        "الأخبار",
-        "الاخبار",
-
         "سعر",
-        "أسعار",
-        "اسعار",
-        "بكام",
-
         "الدولار",
-        "اليورو",
         "الذهب",
-        "البورصة",
-
         "مباراة",
         "مباريات",
         "ماتش",
-
         "نتيجة",
-        "نتائج",
         "موعد",
-
         "اليوم",
         "دلوقتي",
-        "دلوقت",
         "الآن",
         "حاليا",
         "حاليًا",
-        "النهارده",
-        "بكره",
-        "غدا",
-
         "أحدث",
-        "احدث",
         "آخر",
-        "اخر",
-
         "today",
         "now",
         "latest",
-        "recent",
         "news",
         "weather",
         "price",
-        "prices",
-        "score",
-        "match"
+        "score"
     ]
 
-    for keyword in keywords:
+    text_lower = text.lower()
 
-        if keyword in text_lower:
+    for word in words:
+
+        if word in text_lower:
             return True
 
     return False
@@ -260,19 +232,19 @@ def search_web(query):
 
         for href, title in matches[:5]:
 
-            clean_title = re.sub(
+            title = re.sub(
                 r"<.*?>",
                 "",
                 title
             ).strip()
 
-            if clean_title and href:
+            if title and href:
 
                 results.append(
-                    {
-                        "title": clean_title,
-                        "url": href
-                    }
+                    (
+                        title,
+                        href
+                    )
                 )
 
         return results
@@ -286,63 +258,67 @@ def search_web(query):
 # قراءة الملفات
 # =========================================================
 
-def read_uploaded_file(uploaded_file):
+def read_file(uploaded):
 
-    if uploaded_file is None:
+    if uploaded is None:
         return ""
 
-    file_name = uploaded_file.name.lower()
+    name = uploaded.name.lower()
 
-    file_bytes = uploaded_file.getvalue()
+    data = uploaded.getvalue()
 
     try:
 
-        if file_name.endswith(".txt"):
+        if name.endswith(".txt"):
 
-            return file_bytes.decode(
+            return data.decode(
                 "utf-8",
                 errors="ignore"
             )
 
 
-        if file_name.endswith(".pdf"):
+        if name.endswith(".pdf"):
 
             from pypdf import PdfReader
 
             reader = PdfReader(
-                io.BytesIO(file_bytes)
+                io.BytesIO(data)
             )
 
-            pages = []
+            text_parts = []
 
             for page in reader.pages:
 
-                pages.append(
+                text_parts.append(
                     page.extract_text() or ""
                 )
 
-            return "\n".join(pages)
+            return "\n".join(
+                text_parts
+            )
 
 
-        if file_name.endswith(".docx"):
+        if name.endswith(".docx"):
 
             from docx import Document
 
             document = Document(
-                io.BytesIO(file_bytes)
+                io.BytesIO(data)
             )
 
-            paragraphs = []
+            text_parts = []
 
             for paragraph in document.paragraphs:
 
                 if paragraph.text:
 
-                    paragraphs.append(
+                    text_parts.append(
                         paragraph.text
                     )
 
-            return "\n".join(paragraphs)
+            return "\n".join(
+                text_parts
+            )
 
     except Exception:
 
@@ -355,12 +331,12 @@ def read_uploaded_file(uploaded_file):
 # تحويل الصوت إلى نص
 # =========================================================
 
-def audio_to_text(audio_file):
+def speech_to_text(audio):
 
     recognizer = sr.Recognizer()
 
     audio_buffer = io.BytesIO(
-        audio_file.getvalue()
+        audio.getvalue()
     )
 
     with sr.AudioFile(
@@ -394,10 +370,6 @@ def ask_yosef(
     ]
 
 
-    # -----------------------------------------------------
-    # محتوى إضافي
-    # -----------------------------------------------------
-
     if extra_content:
 
         content.extend(
@@ -405,12 +377,43 @@ def ask_yosef(
         )
 
 
-    # -----------------------------------------------------
     # البحث
-    # -----------------------------------------------------
 
     if needs_web_search(text):
 
         results = search_web(text)
 
-       
+        if results:
+
+            search_text = (
+                "معلومات من البحث على الإنترنت:\n\n"
+            )
+
+            for title, url in results:
+
+                search_text += (
+                    title
+                    + "\n"
+                    + url
+                    + "\n\n"
+                )
+
+            content.append(
+                {
+                    "type": "text",
+                    "text": search_text
+                }
+            )
+
+
+    # تاريخ المحادثة
+
+    api_messages = [
+        {
+            "role": "system",
+            "content": SYSTEM_PROMPT
+        }
+    ]
+
+
+    for message in

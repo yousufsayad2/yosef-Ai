@@ -29,7 +29,7 @@ openai_key = st.secrets.get("OPENAI_API_KEY")
 
 
 # =========================================================
-# التأكد من مفتاح OpenRouter
+# التأكد من OpenRouter
 # =========================================================
 
 if not openrouter_key:
@@ -44,7 +44,11 @@ if not openrouter_key:
 client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
     api_key=openrouter_key,
-    timeout=60.0,
+    timeout=90.0,
+    default_headers={
+        "HTTP-Referer": "https://yosef-ai.streamlit.app",
+        "X-Title": "Yosef AI",
+    },
 )
 
 
@@ -54,7 +58,11 @@ client = OpenAI(
 
 MODEL = "openrouter/free"
 
-# المكالمة الحقيقية تحتاج OPENAI_API_KEY
+
+# =========================================================
+# موديل المكالمة
+# =========================================================
+
 REALTIME_MODEL = "gpt-realtime"
 
 
@@ -305,7 +313,6 @@ def create_realtime_client_secret():
         )
 
         if response.status_code not in (200, 201):
-
             return None
 
         data = response.json()
@@ -326,12 +333,11 @@ def create_realtime_client_secret():
         return None
 
     except Exception:
-
         return None
 
 
 # =========================================================
-# واجهة المكالمة الحقيقية
+# واجهة المكالمة
 # =========================================================
 
 def render_realtime_voice():
@@ -340,11 +346,10 @@ def render_realtime_voice():
 
         st.info(
             "🎙️ المكالمة الحقيقية تحتاج OPENAI_API_KEY. "
-            "الشات العادي شغال بمفتاح OpenRouter الموجود عندك."
+            "الشات العادي شغال بمفتاح OpenRouter."
         )
 
         return
-
 
     ephemeral_key = create_realtime_client_secret()
 
@@ -355,11 +360,10 @@ def render_realtime_voice():
         )
 
         st.caption(
-            "تأكد من وجود مفتاح OpenAI صالح في Secrets."
+            "تأكد من وجود OPENAI_API_KEY صالح في Secrets."
         )
 
         return
-
 
     safe_key = json.dumps(ephemeral_key)
 
@@ -477,14 +481,12 @@ def render_realtime_voice():
 
         </div>
 
-
         <script>
 
             const EPHEMERAL_KEY = {safe_key};
 
             let pc = null;
             let localStream = null;
-
 
             const startButton =
                 document.getElementById("start");
@@ -516,7 +518,6 @@ def render_realtime_voice():
                     setStatus(
                         "🎙️ جاري تشغيل الميكروفون..."
                     );
-
 
                     pc = new RTCPeerConnection();
 
@@ -663,10 +664,8 @@ def render_realtime_voice():
                     startButton.disabled = false;
 
                     if (pc) {{
-
                         pc.close();
                         pc = null;
-
                     }}
 
                     if (localStream) {{
@@ -773,11 +772,8 @@ with col1:
 with col2:
 
     if st.session_state.voice_mode:
-
         voice_button_text = "🔴 إغلاق المكالمة"
-
     else:
-
         voice_button_text = "🎙️ تشغيل المكالمة"
 
 
@@ -806,6 +802,7 @@ if st.session_state.voice_mode:
             <div class="voice-title">
                 🎙️ مكالمة Yosef AI الحقيقية
             </div>
+
             <div class="voice-text">
                 اتكلم مع Yosef AI بصوتك بشكل مباشر.
             </div>
@@ -826,14 +823,17 @@ if not st.session_state.messages:
     st.markdown(
         """
         <div class="welcome-box">
+
             <div class="welcome-title">
                 👋 أهلاً بيك في Yosef AI
             </div>
+
             <div class="welcome-text">
                 اكتب سؤالك أو استخدم + لإضافة صورة أو ملف.
                 <br>
                 ويمكنك استخدام المكالمة الصوتية أيضًا.
             </div>
+
         </div>
         """,
         unsafe_allow_html=True,
@@ -852,6 +852,7 @@ def is_developer_question(text):
     text_lower = text.lower().strip()
 
     developer_words = [
+
         "مين مطورك",
         "مين المطور",
         "مين عملك",
@@ -868,10 +869,12 @@ def is_developer_question(text):
         "مين عاملك",
         "مين صنعك",
         "مين مبرمجك",
+
         "who developed you",
         "who made you",
         "who created you",
         "who is your developer",
+
     ]
 
     return any(
@@ -892,6 +895,7 @@ def needs_search(text):
     text_lower = text.lower()
 
     search_words = [
+
         "ابحث",
         "ابحثلي",
         "ابحث لي",
@@ -903,6 +907,7 @@ def needs_search(text):
         "من النت",
         "على الإنترنت",
         "من الإنترنت",
+
         "search",
         "google",
         "look up",
@@ -916,6 +921,7 @@ def needs_search(text):
         "prices",
         "score",
         "match",
+
         "أخبار",
         "اخبار",
         "خبر",
@@ -946,6 +952,7 @@ def needs_search(text):
         "احدث",
         "آخر",
         "اخر",
+
     ]
 
     return any(
@@ -955,7 +962,7 @@ def needs_search(text):
 
 
 # =========================================================
-# البحث السريع
+# البحث
 # =========================================================
 
 def search_web(query):
@@ -973,7 +980,7 @@ def search_web(query):
             headers={
                 "User-Agent": "YosefAI/1.0",
             },
-            timeout=5,
+            timeout=8,
         )
 
         if response.status_code != 200:
@@ -1017,7 +1024,6 @@ def search_web(query):
         )[:5000]
 
     except Exception:
-
         return ""
 
 
@@ -1083,12 +1089,13 @@ def read_file(file):
             for paragraph in document.paragraphs:
 
                 if paragraph.text:
-                    parts.append(paragraph.text)
+                    parts.append(
+                        paragraph.text
+                    )
 
             return "\n".join(parts)
 
     except Exception:
-
         return ""
 
     return ""
@@ -1141,6 +1148,7 @@ def clean_answer(answer):
     answer = str(answer).strip()
 
     forbidden_phrases = [
+
         "Here's a thinking process:",
         "Here is a thinking process:",
         "First, I need to check",
@@ -1149,6 +1157,7 @@ def clean_answer(answer):
         "تحليل المستخدم:",
         "سأحلل المستخدم:",
         "أفكر خطوة بخطوة:",
+
     ]
 
     for phrase in forbidden_phrases:
@@ -1180,9 +1189,12 @@ def build_messages(
 
 
     if extra_content:
-        content.extend(extra_content)
+        content.extend(
+            extra_content
+        )
 
 
+    # البحث فقط عند طلبه
     if needs_search(text):
 
         search_result = search_web(text)
@@ -1208,7 +1220,9 @@ def build_messages(
     ]
 
 
-    for message in st.session_state.messages[-6:]:
+    for message in (
+        st.session_state.messages[-6:]
+    ):
 
         messages.append(
             {
@@ -1230,7 +1244,7 @@ def build_messages(
 
 
 # =========================================================
-# إرسال السؤال
+# إرسال السؤال إلى Yosef AI
 # =========================================================
 
 def ask_yosef_stream(
@@ -1254,11 +1268,17 @@ def ask_yosef_stream(
     try:
 
         stream = client.chat.completions.create(
+
             model=MODEL,
+
             messages=messages,
-            max_tokens=500,
+
+            max_tokens=700,
+
             temperature=0.2,
+
             stream=True,
+
         )
 
         return stream
@@ -1268,15 +1288,17 @@ def ask_yosef_stream(
 
         error_text = str(error)
 
+        lower_error = error_text.lower()
+
 
         if (
             "401" in error_text
-            or "authentication" in error_text.lower()
-            or "unauthorized" in error_text.lower()
+            or "authentication" in lower_error
+            or "unauthorized" in lower_error
         ):
 
             st.error(
-                "❌ مفتاح OpenRouter غير صحيح أو غير مقروء من Secrets."
+                "❌ مفتاح OpenRouter غير صحيح أو غير موجود في Secrets."
             )
 
             return None
@@ -1284,27 +1306,50 @@ def ask_yosef_stream(
 
         if (
             "429" in error_text
-            or "rate limit" in error_text.lower()
-            or "free-models-per-day" in error_text
+            or "rate limit" in lower_error
+            or "too many requests" in lower_error
         ):
 
             st.error(
-                "⏳ OpenRouter وصل للحد المجاني حاليًا."
+                "⏳ وصلت لحد الاستخدام المجاني مؤقتًا. جرّب بعد شوية."
             )
 
             return None
 
 
         if (
-            "model" in error_text.lower()
-            and (
-                "not found" in error_text.lower()
-                or "not available" in error_text.lower()
-            )
+            "402" in error_text
+            or "payment" in lower_error
+            or "credits" in lower_error
         ):
 
             st.error(
-                "❌ النموذج المجاني غير متاح حاليًا. جرّب مرة أخرى."
+                "💳 النموذج المطلوب غير متاح حاليًا بدون رصيد."
+            )
+
+            return None
+
+
+        if (
+            "404" in error_text
+            or "not found" in lower_error
+            or "not available" in lower_error
+        ):
+
+            st.error(
+                "❌ النموذج المجاني غير متاح حاليًا."
+            )
+
+            return None
+
+
+        if (
+            "timeout" in lower_error
+            or "timed out" in lower_error
+        ):
+
+            st.error(
+                "⏳ الاتصال أخذ وقتًا طويلًا. جرّب مرة ثانية."
             )
 
             return None
@@ -1315,7 +1360,7 @@ def ask_yosef_stream(
         )
 
         st.caption(
-            error_text[:500]
+            error_text[:700]
         )
 
         return None
@@ -1386,6 +1431,10 @@ if prompt:
             uploaded_file = prompt.files[0]
 
 
+        # =================================================
+        # الصوت
+        # =================================================
+
         if prompt.audio:
 
             spoken_text = audio_to_text(
@@ -1403,6 +1452,10 @@ if prompt:
             text = spoken_text
 
 
+        # =================================================
+        # التأكد من وجود محتوى
+        # =================================================
+
         if (
             not text
             and not uploaded_file
@@ -1418,6 +1471,10 @@ if prompt:
         extra_content = []
 
 
+        # =================================================
+        # الملفات والصور
+        # =================================================
+
         if uploaded_file:
 
             file_type = (
@@ -1425,7 +1482,13 @@ if prompt:
             )
 
 
-            if file_type.startswith("image/"):
+            # -----------------------------
+            # صورة
+            # -----------------------------
+
+            if file_type.startswith(
+                "image/"
+            ):
 
                 image_bytes = (
                     uploaded_file.getvalue()
@@ -1440,6 +1503,7 @@ if prompt:
                 extra_content.append(
                     {
                         "type": "image_url",
+
                         "image_url": {
                             "url": (
                                 "data:"
@@ -1451,6 +1515,10 @@ if prompt:
                     }
                 )
 
+
+            # -----------------------------
+            # ملف
+            # -----------------------------
 
             else:
 
@@ -1503,9 +1571,13 @@ if prompt:
                 )
 
 
-                if file_type.startswith("image/"):
+                if file_type.startswith(
+                    "image/"
+                ):
 
-                    st.image(uploaded_file)
+                    st.image(
+                        uploaded_file
+                    )
 
                 else:
 
@@ -1548,6 +1620,10 @@ if prompt:
 
             try:
 
+                # -----------------------------------------
+                # رد مباشر
+                # -----------------------------------------
+
                 if isinstance(
                     stream_response,
                     list,
@@ -1561,6 +1637,10 @@ if prompt:
                         full_answer
                     )
 
+
+                # -----------------------------------------
+                # Streaming
+                # -----------------------------------------
 
                 else:
 
@@ -1599,7 +1679,7 @@ if prompt:
                     )
 
                     st.caption(
-                        str(stream_error)[:500]
+                        str(stream_error)[:700]
                     )
 
                     st.stop()

@@ -4,6 +4,7 @@ import base64
 import io
 import requests
 import speech_recognition as sr
+from gtts import gTTS
 
 
 # =========================================================
@@ -28,7 +29,6 @@ if not api_key:
     st.error("❌ OPENROUTER_API_KEY غير موجود في Secrets.")
     st.stop()
 
-
 client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
     api_key=api_key,
@@ -37,7 +37,7 @@ client = OpenAI(
 
 
 # =========================================================
-# الموديل الثابت
+# الموديل
 # =========================================================
 
 MODEL = "nvidia/nemotron-nano-12b-v2-vl:free"
@@ -50,8 +50,8 @@ MODEL = "nvidia/nemotron-nano-12b-v2-vl:free"
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-if "is_generating" not in st.session_state:
-    st.session_state.is_generating = False
+if "voice_mode" not in st.session_state:
+    st.session_state.voice_mode = False
 
 
 # =========================================================
@@ -75,6 +75,7 @@ SYSTEM_PROMPT = """
 مين صاحبك؟
 مين اللي عاملك؟
 مين صانعك؟
+مين مبرمجك؟
 
 أجب مباشرة:
 "أنا Yosef AI، وتم تطويري بواسطة يوسف."
@@ -85,20 +86,9 @@ SYSTEM_PROMPT = """
 
 كن طبيعيًا وودودًا ومختصرًا.
 
-إذا كان السؤال بسيطًا، اجعل الإجابة قصيرة.
+إذا كان السؤال بسيطًا اجعل الرد قصيرًا.
 
-لا تعرض التفكير الداخلي.
-
-لا تعرض خطوات التحليل.
-
-لا تقل:
-Here's a thinking process
-First, I need to check
-Analyze User Input
-Analysis
-تحليل المستخدم
-سأحلل
-أفكر خطوة بخطوة
+لا تعرض التفكير الداخلي أو خطوات التحليل.
 
 أرسل الإجابة النهائية فقط.
 
@@ -120,36 +110,33 @@ Analysis
 
 
 # =========================================================
-# CSS - واجهة Yosef AI
+# CSS - واجهة الشات
 # =========================================================
 
 st.markdown(
     """
     <style>
 
-    /* الصفحة */
     .block-container {
-        max-width: 850px;
-        padding-top: 2rem;
+        max-width: 900px;
+        padding-top: 1rem;
         padding-bottom: 7rem;
     }
 
-    /* العنوان */
     .yosef-header {
         text-align: center;
-        padding: 10px 0 18px 0;
+        padding: 8px 0 18px;
     }
 
     .yosef-logo {
-        font-size: 52px;
+        font-size: 48px;
         line-height: 1;
         margin-bottom: 8px;
     }
 
     .yosef-title {
         font-size: 38px;
-        font-weight: 800;
-        letter-spacing: -1px;
+        font-weight: 850;
         margin: 0;
     }
 
@@ -159,42 +146,36 @@ st.markdown(
         margin-top: 8px;
     }
 
-    /* زر محادثة جديدة */
-    .new-chat-btn button {
-        border-radius: 16px !important;
-        height: 48px !important;
+    div.stButton > button {
+        border-radius: 15px !important;
+        min-height: 46px !important;
         font-weight: 700 !important;
     }
 
-    /* رسائل الشات */
     div[data-testid="stChatMessage"] {
         border-radius: 22px !important;
-        padding: 13px 16px !important;
-        margin-bottom: 10px !important;
-        border: 1px solid rgba(255,255,255,0.05) !important;
+        padding: 12px 15px !important;
+        margin-bottom: 9px !important;
+        border: 1px solid rgba(255,255,255,.06) !important;
     }
 
-    /* رسالة المستخدم */
     div[data-testid="stChatMessage"]:has(
         div[data-testid="chatAvatarIcon-user"]
     ) {
-        background: rgba(45, 48, 58, 0.72) !important;
+        background: rgba(45,48,58,.72) !important;
     }
 
-    /* رسالة المساعد */
     div[data-testid="stChatMessage"]:has(
         div[data-testid="chatAvatarIcon-assistant"]
     ) {
-        background: rgba(24, 27, 34, 0.75) !important;
+        background: rgba(24,27,34,.82) !important;
     }
 
-    /* النص */
     div[data-testid="stChatMessage"] p {
         font-size: 16px !important;
         line-height: 1.75 !important;
     }
 
-    /* مربع الإدخال */
     div[data-testid="stChatInput"] {
         border-radius: 20px !important;
     }
@@ -203,67 +184,71 @@ st.markdown(
         font-size: 16px !important;
     }
 
-    /* الأزرار */
-    button {
-        border-radius: 14px !important;
-    }
-
-    /* رسالة الترحيب */
     .welcome-box {
         text-align: center;
-        padding: 18px;
-        margin: 8px 0 20px 0;
-        border-radius: 22px;
+        padding: 20px 16px;
+        margin: 10px 0 20px;
+        border-radius: 24px;
         background: linear-gradient(
             135deg,
-            rgba(35,38,48,0.8),
-            rgba(24,27,34,0.8)
+            rgba(35,38,48,.82),
+            rgba(24,27,34,.88)
         );
-        border: 1px solid rgba(255,255,255,0.06);
+        border: 1px solid rgba(255,255,255,.07);
     }
 
     .welcome-title {
-        font-size: 20px;
-        font-weight: 700;
+        font-size: 21px;
+        font-weight: 750;
     }
 
     .welcome-text {
         color: #8f96a3;
         font-size: 14px;
-        margin-top: 5px;
+        margin-top: 6px;
     }
 
-    /* فاصل */
-    .soft-line {
-        height: 1px;
-        background: rgba(255,255,255,0.06);
-        margin: 12px 0 20px 0;
+    .voice-box {
+        text-align: center;
+        padding: 12px;
+        margin: 5px 0 15px;
+        border-radius: 18px;
+        background: rgba(35,38,48,.8);
+        border: 1px solid rgba(255,255,255,.07);
     }
 
-    /* موبايل */
+    .voice-box-title {
+        font-weight: 700;
+        font-size: 15px;
+    }
+
+    .voice-box-text {
+        color: #8f96a3;
+        font-size: 13px;
+    }
+
     @media (max-width: 600px) {
 
         .block-container {
-            padding-left: 12px;
-            padding-right: 12px;
-            padding-top: 1rem;
+            padding-left: 10px;
+            padding-right: 10px;
         }
 
         .yosef-logo {
-            font-size: 44px;
+            font-size: 43px;
         }
 
         .yosef-title {
-            font-size: 32px;
+            font-size: 31px;
         }
 
         .yosef-subtitle {
-            font-size: 14px;
+            font-size: 13px;
         }
 
         div[data-testid="stChatMessage"] {
             border-radius: 18px !important;
-            padding: 10px 12px !important;
+            padding: 9px 11px !important;
         }
 
         div[data-testid="stChatMessage"] p {
@@ -287,7 +272,7 @@ st.markdown(
         <div class="yosef-logo">🤖</div>
         <div class="yosef-title">Yosef AI</div>
         <div class="yosef-subtitle">
-            مساعدك الذكي — اسأل، ارفع صورة، أو أرسل ملفًا.
+            مساعدك الذكي — نص، صور، ملفات وصوت.
         </div>
     </div>
     """,
@@ -296,25 +281,71 @@ st.markdown(
 
 
 # =========================================================
-# محادثة جديدة
+# أزرار التحكم
 # =========================================================
 
-st.markdown('<div class="new-chat-btn">', unsafe_allow_html=True)
+col1, col2 = st.columns(2)
 
-if st.button(
-    "🆕  محادثة جديدة",
-    use_container_width=True,
-    key="new_chat",
-):
-    st.session_state.messages = []
-    st.session_state.is_generating = False
-    st.rerun()
+with col1:
 
-st.markdown("</div>", unsafe_allow_html=True)
+    if st.button(
+        "🆕 محادثة جديدة",
+        use_container_width=True,
+        key="new_chat",
+    ):
+
+        st.session_state.messages = []
+        st.session_state.voice_mode = False
+        st.rerun()
+
+
+with col2:
+
+    if st.session_state.voice_mode:
+
+        voice_button = "🔴 إيقاف وضع المكالمة"
+
+    else:
+
+        voice_button = "🎙️ تشغيل وضع المكالمة"
+
+
+    if st.button(
+        voice_button,
+        use_container_width=True,
+        key="voice_mode",
+    ):
+
+        st.session_state.voice_mode = (
+            not st.session_state.voice_mode
+        )
+
+        st.rerun()
 
 
 # =========================================================
-# رسالة ترحيب لو مفيش محادثة
+# وضع المكالمة
+# =========================================================
+
+if st.session_state.voice_mode:
+
+    st.markdown(
+        """
+        <div class="voice-box">
+            <div class="voice-box-title">
+                🎙️ وضع المكالمة مفعّل
+            </div>
+            <div class="voice-box-text">
+                اضغط 🎙️ من خانة الرسالة واتكلم، وسيتم تشغيل رد Yosef AI صوتيًا.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+# =========================================================
+# الترحيب
 # =========================================================
 
 if not st.session_state.messages:
@@ -325,8 +356,9 @@ if not st.session_state.messages:
             <div class="welcome-title">
                 👋 أهلاً بيك في Yosef AI
             </div>
+
             <div class="welcome-text">
-                اكتب سؤالك تحت، أو استخدم زر + لإضافة صورة أو ملف.
+                اكتب سؤالك أو استخدم 🎙️ للصوت أو + لإضافة صورة وملف.
             </div>
         </div>
         """,
@@ -345,7 +377,7 @@ def is_developer_question(text):
 
     text_lower = text.lower().strip()
 
-    developer_words = [
+    words = [
         "مين مطورك",
         "مين المطور",
         "مين عملك",
@@ -368,16 +400,14 @@ def is_developer_question(text):
         "who is your developer",
     ]
 
-    for word in developer_words:
-
-        if word in text_lower:
-            return True
-
-    return False
+    return any(
+        word in text_lower
+        for word in words
+    )
 
 
 # =========================================================
-# البحث الذكي
+# البحث
 # =========================================================
 
 def needs_search(text):
@@ -387,7 +417,7 @@ def needs_search(text):
 
     text_lower = text.lower()
 
-    search_words = [
+    words = [
         "ابحث",
         "ابحثلي",
         "ابحث لي",
@@ -446,12 +476,12 @@ def needs_search(text):
 
     return any(
         word in text_lower
-        for word in search_words
+        for word in words
     )
 
 
 # =========================================================
-# البحث السريع
+# بحث سريع
 # =========================================================
 
 def search_web(query):
@@ -489,27 +519,28 @@ def search_web(query):
                 abstract
             )
 
-        topics = data.get(
+        for item in data.get(
             "RelatedTopics",
             [],
-        )
-
-        for item in topics:
+        ):
 
             if len(results) >= 5:
                 break
 
-            if not isinstance(item, dict):
+            if not isinstance(
+                item,
+                dict,
+            ):
                 continue
 
-            item_text = item.get(
+            text = item.get(
                 "Text",
                 "",
             )
 
-            if item_text:
+            if text:
                 results.append(
-                    item_text
+                    text
                 )
 
         return "\n\n".join(
@@ -538,7 +569,7 @@ def read_file(file):
             file.name or ""
         ).lower()
 
-        # TXT
+
         if name.endswith(".txt"):
 
             return data.decode(
@@ -546,7 +577,7 @@ def read_file(file):
                 errors="ignore",
             )
 
-        # PDF
+
         if name.endswith(".pdf"):
 
             from pypdf import PdfReader
@@ -559,19 +590,17 @@ def read_file(file):
 
             for page in reader.pages:
 
-                page_text = (
+                text = (
                     page.extract_text()
                     or ""
                 )
 
-                if page_text:
-                    parts.append(
-                        page_text
-                    )
+                if text:
+                    parts.append(text)
 
             return "\n".join(parts)
 
-        # DOCX
+
         if name.endswith(".docx"):
 
             from docx import Document
@@ -599,7 +628,7 @@ def read_file(file):
 
 
 # =========================================================
-# الصوت
+# تحويل الصوت إلى نص
 # =========================================================
 
 def audio_to_text(audio):
@@ -634,6 +663,38 @@ def audio_to_text(audio):
 
 
 # =========================================================
+# تحويل النص لصوت
+# =========================================================
+
+def text_to_speech(text):
+
+    if not text:
+        return None
+
+    try:
+
+        audio_buffer = io.BytesIO()
+
+        tts = gTTS(
+            text=text[:3500],
+            lang="ar",
+            slow=False,
+        )
+
+        tts.write_to_fp(
+            audio_buffer
+        )
+
+        audio_buffer.seek(0)
+
+        return audio_buffer.getvalue()
+
+    except Exception:
+
+        return None
+
+
+# =========================================================
 # تنظيف الرد
 # =========================================================
 
@@ -644,7 +705,7 @@ def clean_answer(answer):
 
     answer = str(answer).strip()
 
-    forbidden_phrases = [
+    forbidden = [
         "Here's a thinking process:",
         "Here is a thinking process:",
         "First, I need to check",
@@ -655,7 +716,7 @@ def clean_answer(answer):
         "أفكر خطوة بخطوة:",
     ]
 
-    for phrase in forbidden_phrases:
+    for phrase in forbidden:
 
         if answer.startswith(phrase):
 
@@ -682,13 +743,15 @@ def build_messages(
         }
     ]
 
-    # صورة / ملف
+
     if extra_content:
+
         content.extend(
             extra_content
         )
 
-    # بحث عند الحاجة فقط
+
+    # البحث فقط عند الحاجة
     if needs_search(text):
 
         search_result = search_web(
@@ -707,6 +770,7 @@ def build_messages(
                 }
             )
 
+
     messages = [
         {
             "role": "system",
@@ -714,7 +778,8 @@ def build_messages(
         }
     ]
 
-    # ذاكرة قصيرة = أسرع
+
+    # ذاكرة قصيرة للسرعة
     for message in st.session_state.messages[-6:]:
 
         messages.append(
@@ -723,6 +788,7 @@ def build_messages(
                 "content": message["content"],
             }
         )
+
 
     messages.append(
         {
@@ -735,7 +801,7 @@ def build_messages(
 
 
 # =========================================================
-# إرسال السؤال
+# الاتصال بالموديل
 # =========================================================
 
 def ask_yosef_stream(
@@ -750,14 +816,16 @@ def ask_yosef_stream(
             "أنا Yosef AI، وتم تطويري بواسطة يوسف."
         ]
 
+
     messages = build_messages(
         text,
         extra_content,
     )
 
+
     try:
 
-        stream = client.chat.completions.create(
+        return client.chat.completions.create(
             model=MODEL,
             messages=messages,
             max_tokens=300,
@@ -765,11 +833,11 @@ def ask_yosef_stream(
             stream=True,
         )
 
-        return stream
 
     except Exception as error:
 
         error_text = str(error)
+
 
         if (
             "429" in error_text
@@ -782,6 +850,7 @@ def ask_yosef_stream(
             )
 
             return None
+
 
         if (
             "model" in error_text.lower()
@@ -796,6 +865,7 @@ def ask_yosef_stream(
             )
 
             return None
+
 
         st.error(
             "❌ حصل خطأ أثناء تشغيل Yosef AI."
@@ -843,9 +913,11 @@ for message in st.session_state.messages:
 # =========================================================
 
 prompt = st.chat_input(
-    "اكتب رسالتك...",
+    "اكتب رسالتك أو اضغط 🎙️...",
     accept_file=True,
     accept_audio=True,
+    audio_sample_rate=16000,
+    submit_mode="stop",
     file_type=[
         "png",
         "jpg",
@@ -859,7 +931,7 @@ prompt = st.chat_input(
 
 
 # =========================================================
-# معالجة الرسالة
+# استقبال الرسالة
 # =========================================================
 
 if prompt:
@@ -872,8 +944,9 @@ if prompt:
 
         uploaded_file = None
 
+
         # -------------------------------------------------
-        # الملف
+        # ملف
         # -------------------------------------------------
 
         if prompt.files:
@@ -882,8 +955,9 @@ if prompt:
                 prompt.files[0]
             )
 
+
         # -------------------------------------------------
-        # الصوت
+        # صوت
         # -------------------------------------------------
 
         if prompt.audio:
@@ -902,6 +976,7 @@ if prompt:
 
             text = spoken_text
 
+
         # -------------------------------------------------
         # التأكد
         # -------------------------------------------------
@@ -912,22 +987,25 @@ if prompt:
         ):
 
             st.warning(
-                "اكتب رسالة أو اضغط + لإضافة صورة أو ملف."
+                "اكتب رسالة أو اضغط 🎙️ أو + لإضافة محتوى."
             )
 
             st.stop()
 
+
         # -------------------------------------------------
-        # المحتوى الإضافي
+        # محتوى إضافي
         # -------------------------------------------------
 
         extra_content = []
+
 
         if uploaded_file:
 
             file_type = (
                 uploaded_file.type or ""
             )
+
 
             # صورة
             if file_type.startswith(
@@ -957,6 +1035,7 @@ if prompt:
                         },
                     }
                 )
+
 
             # ملف
             else:
@@ -989,6 +1068,7 @@ if prompt:
                         }
                     )
 
+
         # -------------------------------------------------
         # رسالة المستخدم
         # -------------------------------------------------
@@ -999,7 +1079,11 @@ if prompt:
         ):
 
             if text:
-                st.markdown(text)
+
+                st.markdown(
+                    text
+                )
+
 
             if uploaded_file:
 
@@ -1022,6 +1106,7 @@ if prompt:
                         + uploaded_file.name
                     )
 
+
         # -------------------------------------------------
         # رد Yosef
         # -------------------------------------------------
@@ -1039,17 +1124,20 @@ if prompt:
                 "🤖 Yosef AI بيكتب..."
             )
 
-            stream_response = (
-                ask_yosef_stream(
-                    text,
-                    extra_content,
-                )
+
+            stream_response = ask_yosef_stream(
+                text,
+                extra_content,
             )
 
+
             if stream_response is None:
+
                 st.stop()
 
+
             full_answer = ""
+
 
             try:
 
@@ -1067,13 +1155,16 @@ if prompt:
                         full_answer
                     )
 
+
                 # Streaming
                 else:
 
                     for chunk in stream_response:
 
                         if not chunk.choices:
+
                             continue
+
 
                         delta = (
                             chunk
@@ -1081,10 +1172,12 @@ if prompt:
                             .delta
                         )
 
+
                         piece = (
                             delta.content
                             or ""
                         )
+
 
                         if piece:
 
@@ -1094,7 +1187,8 @@ if prompt:
                                 full_answer
                             )
 
-            except Exception as stream_error:
+
+            except Exception as error:
 
                 if not full_answer:
 
@@ -1103,12 +1197,14 @@ if prompt:
                     )
 
                     st.caption(
-                        str(stream_error)[:500]
+                        str(error)[:500]
                     )
 
                     st.stop()
 
+
             status.empty()
+
 
             if not full_answer:
 
@@ -1118,13 +1214,38 @@ if prompt:
 
                 st.stop()
 
+
             full_answer = clean_answer(
                 full_answer
             )
 
+
             placeholder.markdown(
                 full_answer
             )
+
+
+            # -------------------------------------------------
+            # الصوت
+            # -------------------------------------------------
+
+            if (
+                st.session_state.voice_mode
+                and full_answer
+            ):
+
+                audio_bytes = text_to_speech(
+                    full_answer
+                )
+
+                if audio_bytes:
+
+                    st.audio(
+                        audio_bytes,
+                        format="audio/mp3",
+                        autoplay=True,
+                    )
+
 
         # -------------------------------------------------
         # حفظ المحادثة
@@ -1137,6 +1258,7 @@ if prompt:
             }
         )
 
+
         st.session_state.messages.append(
             {
                 "role": "assistant",
@@ -1144,9 +1266,10 @@ if prompt:
             }
         )
 
+
     except Exception as error:
 
         st.error(
             "❌ حصل خطأ: "
             + str(error)
-                    )
+            )

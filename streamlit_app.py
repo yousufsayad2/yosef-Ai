@@ -3,7 +3,6 @@ from openai import OpenAI
 import base64
 import io
 import requests
-import re
 import speech_recognition as sr
 
 st.set_page_config(
@@ -15,7 +14,7 @@ st.set_page_config(
 api_key = st.secrets.get("OPENROUTER_API_KEY")
 
 if not api_key:
-    st.error("ضع OPENROUTER_API_KEY في Secrets.")
+    st.error("OPENROUTER_API_KEY غير موجود في Secrets.")
     st.stop()
 
 client = OpenAI(
@@ -23,7 +22,7 @@ client = OpenAI(
     api_key=api_key
 )
 
-MODEL = st.secrets.get(
+model = st.secrets.get(
     "OPENROUTER_MODEL",
     "openrouter/free"
 )
@@ -41,51 +40,28 @@ SYSTEM_PROMPT = (
 st.title("🤖 Yosef AI")
 st.caption("أهلاً بيك 👋 أنا Yosef AI، مساعدك الذكي.")
 
-if st.button(
-    "🆕 محادثة جديدة",
-    use_container_width=True
-):
+if st.button("🆕 محادثة جديدة", use_container_width=True):
     st.session_state.messages = []
     st.rerun()
 
 
 def needs_search(text):
     words = [
-        "ابحث",
-        "ابحثلي",
-        "دورلي",
-        "على النت",
-        "الطقس",
-        "الجو",
-        "أخبار",
-        "اخبار",
-        "سعر",
-        "الدولار",
-        "الذهب",
-        "مباراة",
-        "مباريات",
-        "نتيجة",
-        "موعد",
-        "اليوم",
-        "دلوقتي",
-        "الآن",
-        "أحدث",
-        "آخر",
-        "today",
-        "now",
-        "latest",
-        "news",
-        "weather",
-        "price",
-        "score"
+        "ابحث", "ابحثلي", "ابحث لي", "دورلي", "دور لي",
+        "على النت", "الطقس", "الجو", "أخبار", "اخبار", "خبر",
+        "سعر", "الدولار", "الذهب", "مباراة", "مباريات",
+        "ماتش", "نتيجة", "موعد", "اليوم", "دلوقتي", "الآن",
+        "أحدث", "آخر", "today", "now", "latest", "news",
+        "weather", "price", "score"
     ]
 
     low = (text or "").lower()
 
-    return any(
-        word in low
-        for word in words
-    )
+    for word in words:
+        if word in low:
+            return True
+
+    return False
 
 
 def search_web(query):
@@ -100,12 +76,235 @@ def search_web(query):
         if response.status_code != 200:
             return []
 
-        pattern = re.compile(
-            r'class="result__a"[^>]*href="([^"]+)"[^>]*>(.*?)</a>',
-            re.I | re.S
+        return []
+
+    except Exception:
+        return []
+
+
+def read_file(file):
+    if not file:
+        return ""
+
+    try:
+        data = file.getvalue()
+        name = file.name.lower()
+
+        if name.endswith(".txt"):
+            return data.decode(
+                "utf-8",
+                errors="ignore"
+            )
+
+        if name.endswith(".pdf"):
+            from pypdf import PdfReader
+
+            reader = PdfReader(
+                io.BytesIO(data)
+            )
+
+            parts = []
+
+            for page in reader.pages:
+                parts.append(
+                    page.extract_text() or ""
+                )
+
+            return "\n".join(parts)
+
+        if name.endswith(".docx"):
+            from docx import Document
+
+            document = Document(
+                io.BytesIO(data)
+            )
+
+            parts = []
+
+            for paragraph in document.paragraphs:
+                if paragraph.text:
+                    parts.append(
+                        paragraph.text
+                    )
+
+            return "\n".join(parts)
+
+    except Exception:
+        return ""
+
+    return ""
+
+
+def audio_to_text(audio):
+    recognizer = sr.Recognizer()
+
+    buffer = io.BytesIO(
+        audio.getvalue()
+    )
+
+    with sr.AudioFile(buffer) as source:
+        data = recognizer.record(source)
+
+    return recognizer.recognize_google(
+        data,
+        language="ar-EG"
+    )
+
+
+def ask_yosef(text, extra):
+    content = [
+        {
+            "type": "text",
+            "text": text or ""
+        }
+    ]
+
+    if extra:
+        content.extend(extra)
+
+    messages = [
+        {
+            "role": "system",
+            "content": SYSTEM_PROMPT
+        }
+    ]
+
+    messages.extend(
+        st.session_state.messages[-20:]
+    )
+
+    messages.append(
+        {
+            "role": "user",
+            "content": content
+        }
+    )
+
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            max_tokens=800
         )
 
-        results = []
+        return (
+            response.choices[0].message.content
+            or "لم أتمكن من إنشاء رد."
+        )
 
-        for href, title in pattern.findall(
-            response.text
+    except Exception as error:
+
+        if (
+            "429" in str(error)
+            or "free-models-per-day" in str(error)
+        ):
+            st.warning(
+                "⏳ انتهى الحد المجاني في OpenRouter حاليًا."
+            )
+        else:
+            st.error(
+                "❌ حصل خطأ أثناء تشغيل Yosef AI."
+            )
+
+        return None
+
+
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+
+uploaded = st.file_uploader(
+    "📎 ارفع صورة أو ملف",
+    type=[
+        "png",
+        "jpg",
+        "jpeg",
+        "webp",
+        "txt",
+        "pdf",
+        "docx"
+    ]
+)
+
+extra = []
+
+if uploaded:
+
+    file_type = uploaded.type or ""
+
+    if file_type.startswith("image/"):
+
+        st.image(
+            uploaded,
+            caption=uploaded.name
+        )
+
+        encoded = base64.b64encode(
+            uploaded.getvalue()
+        ).decode("utf-8")
+
+        extra.append(
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": (
+                        "data:"
+                        + file_type
+                        + ";base64,"
+                        + encoded
+                    )
+                }
+            }
+        )
+
+    else:
+
+        st.info(
+            "📎 " + uploaded.name
+        )
+
+        file_text = read_file(
+            uploaded
+        )
+
+        if file_text:
+
+            extra.append(
+                {
+                    "type": "text",
+                    "text": (
+                        "محتوى الملف:\n"
+                        + file_text[:20000]
+                    )
+                }
+            )
+
+
+audio = st.audio_input(
+    "🎙️ سجل صوتك"
+)
+
+if audio:
+
+    try:
+
+        spoken = audio_to_text(
+            audio
+        )
+
+        with st.spinner(
+            "🤖 Yosef AI بيفكر..."
+        ):
+
+            answer = ask_yosef(
+                spoken,
+                []
+            )
+
+        if answer:
+
+            st.session_state.messages.append(
+                {
+                    "role": "user",
+                    "content": spoken

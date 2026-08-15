@@ -8,7 +8,7 @@ import speech_recognition as sr
 st.set_page_config(
     page_title="Yosef AI",
     page_icon="🤖",
-    layout="centered"
+    layout="centered",
 )
 
 api_key = st.secrets.get("OPENROUTER_API_KEY")
@@ -19,22 +19,25 @@ if not api_key:
 
 client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
-    api_key=api_key
+    api_key=api_key,
 )
 
 model = st.secrets.get(
     "OPENROUTER_MODEL",
-    "openrouter/free"
+    "openrouter/free",
 )
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
 SYSTEM_PROMPT = (
-    "أنت Yosef AI. اسمك Yosef AI. "
+    "أنت Yosef AI، مساعد ذكي داخل تطبيق اسمه Yosef AI. "
+    "اسمك Yosef AI. "
     "إذا سأل المستخدم عن المطور قل: تم تطوير Yosef AI بواسطة يوسف. "
-    "لا تقل إنك ChatGPT. أجب بلغة المستخدم وبأسلوب طبيعي. "
-    "لا تعرض خطوات التفكير الداخلية. لا تخترع معلومات."
+    "لا تقل إنك ChatGPT. "
+    "أجب بلغة المستخدم وبأسلوب طبيعي وودود. "
+    "لا تعرض خطوات التفكير الداخلية. "
+    "لا تخترع معلومات."
 )
 
 st.title("🤖 Yosef AI")
@@ -67,19 +70,62 @@ def needs_search(text):
 def search_web(query):
     try:
         response = requests.get(
-            "https://html.duckduckgo.com/html/",
-            params={"q": query},
-            headers={"User-Agent": "Mozilla/5.0"},
-            timeout=8
+            "https://api.duckduckgo.com/",
+            params={
+                "q": query,
+                "format": "json",
+                "no_html": "1",
+                "skip_disambig": "1",
+            },
+            headers={
+                "User-Agent": "YosefAI/1.0"
+            },
+            timeout=10,
         )
 
         if response.status_code != 200:
-            return []
+            return ""
 
-        return []
+        data = response.json()
+        parts = []
+
+        abstract = data.get(
+            "AbstractText",
+            ""
+        )
+
+        if abstract:
+            parts.append(abstract)
+
+        for item in data.get(
+            "RelatedTopics",
+            []
+        )[:5]:
+
+            if isinstance(item, dict):
+
+                text = item.get(
+                    "Text",
+                    ""
+                )
+
+                url = item.get(
+                    "FirstURL",
+                    ""
+                )
+
+                if text:
+                    parts.append(text)
+
+                if url:
+                    parts.append(url)
+
+        return "\n\n".join(
+            parts[:10]
+        )
 
     except Exception:
-        return []
+        return ""
 
 
 def read_file(file):
@@ -122,6 +168,7 @@ def read_file(file):
             parts = []
 
             for paragraph in document.paragraphs:
+
                 if paragraph.text:
                     parts.append(
                         paragraph.text
@@ -142,30 +189,57 @@ def audio_to_text(audio):
         audio.getvalue()
     )
 
-    with sr.AudioFile(buffer) as source:
-        data = recognizer.record(source)
+    with sr.AudioFile(
+        buffer
+    ) as source:
+
+        data = recognizer.record(
+            source
+        )
 
     return recognizer.recognize_google(
         data,
-        language="ar-EG"
+        language="ar-EG",
     )
 
 
-def ask_yosef(text, extra):
+def ask_yosef(
+    text,
+    extra=None
+):
+
     content = [
         {
             "type": "text",
-            "text": text or ""
+            "text": text or "",
         }
     ]
 
     if extra:
         content.extend(extra)
 
+    if needs_search(text):
+
+        search_result = search_web(
+            text
+        )
+
+        if search_result:
+
+            content.append(
+                {
+                    "type": "text",
+                    "text": (
+                        "معلومات من البحث على الإنترنت:\n\n"
+                        + search_result[:12000]
+                    ),
+                }
+            )
+
     messages = [
         {
             "role": "system",
-            "content": SYSTEM_PROMPT
+            "content": SYSTEM_PROMPT,
         }
     ]
 
@@ -176,32 +250,46 @@ def ask_yosef(text, extra):
     messages.append(
         {
             "role": "user",
-            "content": content
+            "content": content,
         }
     )
 
     try:
+
         response = client.chat.completions.create(
             model=model,
             messages=messages,
-            max_tokens=800
+            max_tokens=800,
+        )
+
+        answer = (
+            response
+            .choices[0]
+            .message
+            .content
         )
 
         return (
-            response.choices[0].message.content
+            answer
             or "لم أتمكن من إنشاء رد."
         )
 
     except Exception as error:
 
+        error_text = str(error)
+
         if (
-            "429" in str(error)
-            or "free-models-per-day" in str(error)
+            "429" in error_text
+            or "free-models-per-day" in error_text
+            or "Rate limit exceeded" in error_text
         ):
+
             st.warning(
                 "⏳ انتهى الحد المجاني في OpenRouter حاليًا."
             )
+
         else:
+
             st.error(
                 "❌ حصل خطأ أثناء تشغيل Yosef AI."
             )
@@ -210,8 +298,14 @@ def ask_yosef(text, extra):
 
 
 for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+
+    with st.chat_message(
+        message["role"]
+    ):
+
+        st.markdown(
+            message["content"]
+        )
 
 
 uploaded = st.file_uploader(
@@ -223,11 +317,13 @@ uploaded = st.file_uploader(
         "webp",
         "txt",
         "pdf",
-        "docx"
-    ]
+        "docx",
+    ],
 )
 
+
 extra = []
+
 
 if uploaded:
 
@@ -237,7 +333,7 @@ if uploaded:
 
         st.image(
             uploaded,
-            caption=uploaded.name
+            caption=uploaded.name,
         )
 
         encoded = base64.b64encode(
@@ -254,7 +350,7 @@ if uploaded:
                         + ";base64,"
                         + encoded
                     )
-                }
+                },
             }
         )
 
@@ -276,14 +372,15 @@ if uploaded:
                     "text": (
                         "محتوى الملف:\n"
                         + file_text[:20000]
-                    )
+                    ),
                 }
             )
 
 
 audio = st.audio_input(
-    "🎙️ سجل صوتك"
+    "🎙️ سجل صوتك",
 )
+
 
 if audio:
 
@@ -298,8 +395,7 @@ if audio:
         ):
 
             answer = ask_yosef(
-                spoken,
-                []
+                spoken
             )
 
         if answer:
@@ -307,4 +403,95 @@ if audio:
             st.session_state.messages.append(
                 {
                     "role": "user",
-                    "content": spoken
+                    "content": spoken,
+                }
+            )
+
+            st.session_state.messages.append(
+                {
+                    "role": "assistant",
+                    "content": answer,
+                }
+            )
+
+            st.rerun()
+
+    except sr.UnknownValueError:
+
+        st.error(
+            "❌ مش قادر أفهم التسجيل."
+        )
+
+    except sr.RequestError:
+
+        st.error(
+            "❌ خدمة تحويل الصوت غير متاحة."
+        )
+
+    except Exception as error:
+
+        st.error(
+            "❌ حصل خطأ في الصوت: "
+            + str(error)
+        )
+
+
+prompt = st.chat_input(
+    "اكتب رسالتك..."
+)
+
+
+if prompt:
+
+    with st.chat_message(
+        "user"
+    ):
+
+        st.markdown(
+            prompt
+        )
+
+        if uploaded:
+
+            file_type = uploaded.type or ""
+
+            if file_type.startswith("image/"):
+
+                st.image(
+                    uploaded
+                )
+
+    with st.spinner(
+        "🤖 Yosef AI بيفكر..."
+    ):
+
+        answer = ask_yosef(
+            prompt,
+            extra,
+        )
+
+    if answer:
+
+        with st.chat_message(
+            "assistant"
+        ):
+
+            st.markdown(
+                answer
+            )
+
+        st.session_state.messages.append(
+            {
+                "role": "user",
+                "content": prompt,
+            }
+        )
+
+        st.session_state.messages.append(
+            {
+                "role": "assistant",
+                "content": answer,
+            }
+        )
+
+        st.rerun()

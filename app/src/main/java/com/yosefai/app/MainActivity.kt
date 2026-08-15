@@ -1,33 +1,26 @@
 package com.yosefai.app
 
-import android.annotation.SuppressLint
+import android.app.Activity
 import android.os.Bundle
 import android.webkit.WebChromeClient
-import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import androidx.activity.ComponentActivity
 
-class MainActivity : ComponentActivity() {
+class MainActivity : Activity() {
 
     private lateinit var webView: WebView
 
-    @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         webView = WebView(this)
 
-        webView.settings.apply {
-            javaScriptEnabled = true
-            domStorageEnabled = true
-            databaseEnabled = true
-            loadsImagesAutomatically = true
-            allowFileAccess = true
-            allowContentAccess = true
-            cacheMode = WebSettings.LOAD_DEFAULT
-            userAgentString = userAgentString + " YosefAIApp"
-        }
+        webView.settings.javaScriptEnabled = true
+        webView.settings.domStorageEnabled = true
+        webView.settings.databaseEnabled = true
+        webView.settings.loadsImagesAutomatically = true
+        webView.settings.allowFileAccess = true
+        webView.settings.allowContentAccess = true
 
         webView.webViewClient = WebViewClient()
         webView.webChromeClient = WebChromeClient()
@@ -48,6 +41,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        webView.stopLoading()
         webView.destroy()
         super.onDestroy()
     }

@@ -10,7 +10,7 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
 
         val text = TextView(this)
-        text.text = "Yosef AI يعمل بنجاح"
+        text.text = "Yosef AI\nالتطبيق اشتغل بنجاح"
         text.textSize = 24f
         text.setPadding(40, 40, 40, 40)
 

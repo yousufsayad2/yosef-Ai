@@ -2,6 +2,8 @@ import streamlit as st
 from openai import OpenAI
 import base64
 import io
+import re
+import requests
 import speech_recognition as sr
 
 
@@ -27,6 +29,13 @@ client = OpenAI(
     api_key=api_key
 )
 
+# يمكنك وضع موديل معين في Secrets باسم OPENROUTER_MODEL
+# ولو مش موجود، هيستخدم openrouter/free
+MODEL_NAME = st.secrets.get(
+    "OPENROUTER_MODEL",
+    "openrouter/free"
+)
+
 
 # =========================================================
 # الذاكرة
@@ -48,36 +57,81 @@ system_prompt = """
 
 اسمك Yosef AI.
 
-لا تقل إنك ChatGPT.
+لا تقل إنك ChatGPT أو المساعد الرسمي لـ OpenAI.
 
 أجب باللغة التي يستخدمها المستخدم.
 
 كن طبيعيًا وودودًا ومفيدًا.
 
+تعامل مع المستخدم كأنك مساعد شخصي ذكي.
+
 في المحادثة الصوتية:
-- تكلم بطريقة طبيعية.
+- تحدث بطريقة طبيعية.
 - اجعل الرد واضحًا ومختصرًا.
 - لا تستخدم مقدمات طويلة.
-- تعامل مع المستخدم كأنه يتحدث مع مساعد صوتي.
+- لا تكرر كلام المستخدم بدون سبب.
+
+إذا تم إعطاؤك معلومات من البحث على الإنترنت:
+- استخدم المعلومات المتاحة.
+- لا تخترع معلومات.
+- إذا كانت المعلومات غير كافية، قل ذلك بوضوح.
+- لا تذكر تفاصيل البحث الداخلية للمستخدم.
 
 إذا أرسل المستخدم صورة:
-- حلل الصورة وساعده فيها.
-- لا تخترع أشياء غير واضحة في الصورة.
+- حلل الصورة قدر الإمكان.
+- لا تخترع تفاصيل غير واضحة.
 
 إذا أرسل المستخدم ملفًا:
-- استخدم المعلومات المتاحة منه.
-- إذا لم تستطع قراءة محتوى الملف، وضح ذلك.
+- استخدم محتوى الملف إذا كان متاحًا.
+- إذا كان المحتوى غير متاح، وضح ذلك.
 """
+
+
+# =========================================================
+# CSS
+# =========================================================
+
+st.markdown(
+    """
+    <style>
+
+    .yosef-title {
+        text-align: center;
+        font-size: 34px;
+        font-weight: 700;
+        margin-top: 15px;
+        margin-bottom: 5px;
+    }
+
+    .yosef-subtitle {
+        text-align: center;
+        color: #777;
+        margin-bottom: 20px;
+        font-size: 16px;
+    }
+
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 
 # =========================================================
 # العنوان
 # =========================================================
 
-st.title("🤖 Yosef AI")
+st.markdown(
+    '<div class="yosef-title">🤖 Yosef AI</div>',
+    unsafe_allow_html=True
+)
 
-st.write("أهلاً بيك 👋")
-st.write("أنا Yosef AI، مساعدك الذكي. اسألني أي حاجة!")
+st.markdown(
+    '<div class="yosef-subtitle">'
+    'أهلاً بيك 👋<br>'
+    'أنا Yosef AI، مساعدك الذكي. اسألني أي حاجة!'
+    '</div>',
+    unsafe_allow_html=True
+)
 
 
 # =========================================================
@@ -97,12 +151,14 @@ if st.button(
 
 
 # =========================================================
-# عرض المحادثة
+# عرض المحادثة السابقة
 # =========================================================
 
 for message in st.session_state.messages:
 
-    with st.chat_message(message["role"]):
+    with st.chat_message(
+        message["role"]
+    ):
 
         st.markdown(
             message["content"]
@@ -110,310 +166,139 @@ for message in st.session_state.messages:
 
 
 # =========================================================
-# طلب الرد من Yosef
+# تحديد هل السؤال يحتاج بحث
 # =========================================================
 
-def ask_yosef(text, extra_content=None):
+def needs_web_search(text):
 
-    content = [
-        {
-            "type": "text",
-            "text": text
-        }
+    if not text:
+        return False
+
+    text_lower = text.lower().strip()
+
+    # -----------------------------------------------------
+    # المستخدم طلب البحث صراحة
+    # -----------------------------------------------------
+
+    explicit_words = [
+        "ابحث",
+        "ابحثلي",
+        "ابحث لي",
+        "دورلي",
+        "دور لي",
+        "شوفلي",
+        "شوف لي",
+        "هاتلي معلومات",
+        "هات لي معلومات",
+        "على الانترنت",
+        "علي الانترنت",
+        "من النت",
+        "من الإنترنت",
+        "search",
+        "google",
+        "look up"
     ]
 
-    # إضافة صورة أو محتوى إضافي
-    if extra_content:
+    for word in explicit_words:
 
-        content.extend(
-            extra_content
-        )
+        if word in text_lower:
+            return True
 
-    api_messages = [
-        {
-            "role": "system",
-            "content": system_prompt
-        }
+
+    # -----------------------------------------------------
+    # معلومات حديثة
+    # -----------------------------------------------------
+
+    current_words = [
+        "دلوقتي",
+        "دلوقت",
+        "الآن",
+        "ان",
+        "حاليًا",
+        "حاليا",
+        "اليوم",
+        "النهارده",
+        "بكره",
+        "غدا",
+        "امبارح",
+        "آخر",
+        "اخر",
+        "أحدث",
+        "احدث",
+        "الجديد",
+        "حالي",
+        "current",
+        "today",
+        "now",
+        "latest",
+        "recent"
     ]
 
-    # تاريخ المحادثة
-    for message in st.session_state.messages:
+    for word in current_words:
 
-        api_messages.append(
-            {
-                "role": message["role"],
-                "content": message["content"]
-            }
-        )
-
-    # الرسالة الحالية
-    api_messages.append(
-        {
-            "role": "user",
-            "content": content
-        }
-    )
-
-    try:
-
-        response = client.chat.completions.create(
-            model="openrouter/free",
-            messages=api_messages,
-            max_tokens=800
-        )
-
-        answer = (
-            response.choices[0]
-            .message.content
-        )
-
-        if not answer:
-
-            return "لم أتمكن من إنشاء رد."
-
-        return answer
-
-    except Exception as error:
-
-        error_text = str(error)
-
-        if (
-            "429" in error_text
-            or "free-models-per-day" in error_text
-        ):
-
-            st.warning(
-                "⏳ وصلت للحد المجاني للطلبات اليوم."
-            )
-
-            st.info(
-                "جرّب مرة أخرى بعد تجدد الحد المجاني."
-            )
-
-        else:
-
-            st.error(
-                "❌ حصل خطأ أثناء تشغيل Yosef AI."
-            )
-
-        return None
+        if word in text_lower:
+            return True
 
 
-# =========================================================
-# تحويل النص إلى صوت
-# =========================================================
+    # -----------------------------------------------------
+    # أخبار وطقس وأسعار
+    # -----------------------------------------------------
 
-def speak_text(text):
-
-    safe_text = str(text)
-# =========================================================
-# خانة الكتابة + الصور + الملفات + الصوت
-# =========================================================
-
-prompt = st.chat_input(
-    "اكتب رسالتك...",
-    accept_file=True,
-    accept_audio=True,
-    file_type=[
-        "png",
-        "jpg",
-        "jpeg",
-        "webp",
-        "txt",
-        "pdf",
-        "docx"
+    live_topics = [
+        "أخبار",
+        "اخبار",
+        "خبر",
+        "الأخبار",
+        "الاخبار",
+        "الطقس",
+        "الجو",
+        "درجة الحرارة",
+        "حرارة",
+        "مطر",
+        "رياح",
+        "سعر",
+        "أسعار",
+        "اسعار",
+        "بكام",
+        "الدولار",
+        "اليورو",
+        "الذهب",
+        "البورصة",
+        "مباراة",
+        "مباريات",
+        "ماتش",
+        "نتيجة",
+        "نتائج",
+        "موعد",
+        "news",
+        "weather",
+        "price",
+        "prices",
+        "score",
+        "match"
     ]
-)
+
+    for word in live_topics:
+
+        if word in text_lower:
+            return True
 
 
-# =========================================================
-# استقبال الرسالة
-# =========================================================
+    # -----------------------------------------------------
+    # أسئلة معلوماتية تستفيد من البحث
+    # -----------------------------------------------------
 
-if prompt:
-
-    try:
-
-        text = prompt.text or ""
-
-        uploaded_file = None
-
-        if prompt.files:
-            uploaded_file = prompt.files[0]
-
-
-        # -------------------------------------------------
-        # لو مفيش كلام ولا ملف
-        # -------------------------------------------------
-
-        if not text and not uploaded_file and not prompt.audio:
-
-            st.warning(
-                "اكتب رسالة أو ارفع صورة أو ملف."
-            )
-
-            st.stop()
-
-
-        # -------------------------------------------------
-        # عرض رسالة المستخدم
-        # -------------------------------------------------
-
-        with st.chat_message("user"):
-
-            if text:
-                st.markdown(text)
-
-            if uploaded_file:
-
-                file_type = uploaded_file.type or ""
-
-                if file_type.startswith("image/"):
-
-                    st.image(uploaded_file)
-
-                else:
-
-                    st.write(
-                        "📎 " + uploaded_file.name
-                    )
-
-
-        # -------------------------------------------------
-        # تجهيز الرسالة
-        # -------------------------------------------------
-
-        content = [
-            {
-                "type": "text",
-                "text": text
-            }
-        ]
-
-
-        # -------------------------------------------------
-        # إرسال الصورة للذكاء الاصطناعي
-        # -------------------------------------------------
-
-        if uploaded_file:
-
-            file_type = uploaded_file.type or ""
-
-            if file_type.startswith("image/"):
-
-                image_bytes = uploaded_file.getvalue()
-
-                image_base64 = base64.b64encode(
-                    image_bytes
-                ).decode("utf-8")
-
-                content.append(
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": (
-                                "data:"
-                                + file_type
-                                + ";base64,"
-                                + image_base64
-                            )
-                        }
-                    }
-                )
-
-
-        # -------------------------------------------------
-        # تاريخ المحادثة
-        # -------------------------------------------------
-
-        api_messages = [
-            {
-                "role": "system",
-                "content": system_prompt
-            }
-        ]
-
-
-        for message in st.session_state.messages:
-
-            api_messages.append(
-                {
-                    "role": message["role"],
-                    "content": message["content"]
-                }
-            )
-
-
-        # -------------------------------------------------
-        # رسالة المستخدم الحالية
-        # -------------------------------------------------
-
-        api_messages.append(
-            {
-                "role": "user",
-                "content": content
-            }
-        )
-
-
-        # -------------------------------------------------
-        # إرسال إلى Yosef AI
-        # -------------------------------------------------
-
-        with st.spinner(
-            "🤖 Yosef AI بيفكر..."
-        ):
-
-            response = client.chat.completions.create(
-                model="openrouter/free",
-                messages=api_messages,
-                max_tokens=800
-            )
-
-
-        # -------------------------------------------------
-        # الحصول على الرد
-        # -------------------------------------------------
-
-        answer = (
-            response.choices[0]
-            .message.content
-            or "لم أتمكن من إنشاء رد."
-        )
-
-
-        # -------------------------------------------------
-        # عرض الرد
-        # -------------------------------------------------
-
-        with st.chat_message("assistant"):
-
-            st.markdown(answer)
-
-
-        # -------------------------------------------------
-        # حفظ المحادثة
-        # -------------------------------------------------
-
-        st.session_state.messages.append(
-            {
-                "role": "user",
-                "content": text
-            }
-        )
-
-        st.session_state.messages.append(
-            {
-                "role": "assistant",
-                "content": answer
-            }
-        )
-
-
-    except Exception as error:
-
-        st.error(
-            "❌ حصل خطأ: "
-            + str(error)
-        )
-   
+    factual_patterns = [
+        "مين هو",
+        "مين هي",
+        "من هو",
+        "من هي",
+        "ما هو",
+        "ما هي",
+        "ايه هو",
+        "ايه هي",
+        "ما معنى",
+        "معنى",
+        "معلومات عن",
+        "معلومات حول",
+        "

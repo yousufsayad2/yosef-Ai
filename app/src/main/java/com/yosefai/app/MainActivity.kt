@@ -2,40 +2,19 @@ package com.yosefai.app
 
 import android.app.Activity
 import android.os.Bundle
-import android.webkit.WebChromeClient
-import android.webkit.WebView
-import android.webkit.WebViewClient
+import android.content.Intent
+import android.net.Uri
 
 class MainActivity : Activity() {
-
-    private lateinit var webView: WebView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        webView = WebView(this)
+        val url = "https://yosef-ai-2pzqmuovs4ggxc5wyvz8ce.streamlit.app/"
 
-        webView.settings.javaScriptEnabled = true
-        webView.settings.domStorageEnabled = true
-        webView.settings.databaseEnabled = true
-        webView.settings.loadsImagesAutomatically = true
-        webView.settings.allowFileAccess = true
-        webView.settings.allowContentAccess = true
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+        startActivity(intent)
 
-        webView.webViewClient = WebViewClient()
-        webView.webChromeClient = WebChromeClient()
-
-        // ضع نفس رابط موقعك الموجود حاليًا هنا
-        webView.loadUrl("ضع_الرابط_هنا")
-
-        setContentView(webView)
-    }
-
-    override fun onBackPressed() {
-        if (webView.canGoBack()) {
-            webView.goBack()
-        } else {
-            super.onBackPressed()
-        }
+        finish()
     }
 }

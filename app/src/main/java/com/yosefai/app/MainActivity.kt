@@ -25,9 +25,8 @@ class MainActivity : Activity() {
         webView.webViewClient = WebViewClient()
         webView.webChromeClient = WebChromeClient()
 
-        webView.loadUrl(
-            "https://yosef-ai-2pzqmuovs4ggxc5wyvz8ce.streamlit.app/"
-        )
+        // ضع نفس رابط موقعك الموجود حاليًا هنا
+        webView.loadUrl("ضع_الرابط_هنا")
 
         setContentView(webView)
     }
@@ -38,11 +37,5 @@ class MainActivity : Activity() {
         } else {
             super.onBackPressed()
         }
-    }
-
-    override fun onDestroy() {
-        webView.stopLoading()
-        webView.destroy()
-        super.onDestroy()
     }
 }

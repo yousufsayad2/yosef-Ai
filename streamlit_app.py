@@ -6,22 +6,16 @@ import requests
 import re
 import speech_recognition as sr
 
-
 st.set_page_config(
     page_title="Yosef AI",
     page_icon="🤖",
     layout="centered"
 )
 
-
-# =========================================================
-# OpenRouter
-# =========================================================
-
 api_key = st.secrets.get("OPENROUTER_API_KEY")
 
 if not api_key:
-    st.error("❌ OPENROUTER_API_KEY غير موجود في Secrets.")
+    st.error("OPENROUTER_API_KEY غير موجود في Secrets.")
     st.stop()
 
 client = OpenAI(
@@ -34,122 +28,66 @@ MODEL = st.secrets.get(
     "openrouter/free"
 )
 
-
-# =========================================================
-# الذاكرة
-# =========================================================
-
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-
-# =========================================================
-# تعليمات Yosef AI
-# =========================================================
-
 SYSTEM_PROMPT = """
 أنت Yosef AI، مساعد ذكي داخل تطبيق اسمه Yosef AI.
-
 اسمك Yosef AI.
-
-إذا سأل المستخدم:
-من طورك؟
-من عملك؟
-مين مطورك؟
-
-قل:
-تم تطوير Yosef AI بواسطة يوسف.
-
+إذا سأل المستخدم عن المطور، قل: تم تطوير Yosef AI بواسطة يوسف.
 لا تقل إنك ChatGPT.
-
-أجب باللغة التي يستخدمها المستخدم.
-
-كن طبيعيًا وودودًا ومفيدًا.
-
+أجب بلغة المستخدم وبأسلوب طبيعي وودود.
 لا تعرض خطوات التفكير الداخلية أو التحليل الداخلي.
 أعط الإجابة النهائية فقط.
-
-إذا أرسل المستخدم صورة:
-حلل ما يظهر بوضوح فقط ولا تخترع تفاصيل.
-
-إذا أرسل المستخدم ملفًا:
-استخدم المعلومات المتاحة منه فقط.
-
-إذا تم إعطاؤك معلومات من البحث:
-استخدم المعلومات الموجودة ولا تخترع معلومات.
+إذا أرسل المستخدم صورة، حلل ما يظهر بوضوح فقط.
+إذا أرسل المستخدم ملفًا، استخدم المعلومات المتاحة منه فقط.
 """
-
-
-# =========================================================
-# CSS
-# =========================================================
 
 st.markdown(
     """
     <style>
-
-    .yosef-title {
+    .title {
         text-align: center;
         font-size: 34px;
         font-weight: 700;
-        margin-top: 20px;
     }
 
-    .yosef-subtitle {
+    .subtitle {
         text-align: center;
         color: #777;
-        font-size: 16px;
         margin-bottom: 20px;
     }
-
     </style>
     """,
     unsafe_allow_html=True
 )
 
-
-# =========================================================
-# العنوان
-# =========================================================
-
 st.markdown(
-    '<div class="yosef-title">🤖 Yosef AI</div>',
+    '<div class="title">🤖 Yosef AI</div>',
     unsafe_allow_html=True
 )
 
 st.markdown(
-    '<div class="yosef-subtitle">'
+    '<div class="subtitle">'
     'أهلاً بيك 👋<br>'
     'أنا Yosef AI، مساعدك الذكي. اسألني أي حاجة!'
     '</div>',
     unsafe_allow_html=True
 )
 
-
-# =========================================================
-# محادثة جديدة
-# =========================================================
-
 if st.button(
     "🆕 محادثة جديدة",
     use_container_width=True
 ):
-
     st.session_state.messages = []
-
     st.rerun()
 
 
-# =========================================================
-# البحث الذكي
-# =========================================================
-
 def needs_web_search(text):
-
     if not text:
         return False
 
-    words = [
+    keywords = [
         "ابحث",
         "ابحثلي",
         "ابحث لي",
@@ -187,32 +125,21 @@ def needs_web_search(text):
         "score"
     ]
 
-    text_lower = text.lower()
+    low = text.lower()
 
-    for word in words:
-
-        if word in text_lower:
+    for word in keywords:
+        if word in low:
             return True
 
     return False
 
 
-# =========================================================
-# البحث على الإنترنت
-# =========================================================
-
 def search_web(query):
-
     try:
-
         response = requests.get(
             "https://html.duckduckgo.com/html/",
-            params={
-                "q": query
-            },
-            headers={
-                "User-Agent": "Mozilla/5.0"
-            },
+            params={"q": query},
+            headers={"User-Agent": "Mozilla/5.0"},
             timeout=10
         )
 
@@ -224,25 +151,22 @@ def search_web(query):
             re.IGNORECASE | re.DOTALL
         )
 
-        matches = pattern.findall(
-            response.text
-        )
-
         results = []
 
-        for href, title in matches[:5]:
+        for href, title in pattern.findall(
+            response.text
+        )[:5]:
 
-            title = re.sub(
+            clean_title = re.sub(
                 r"<.*?>",
                 "",
                 title
             ).strip()
 
-            if title and href:
-
+            if clean_title:
                 results.append(
                     (
-                        title,
+                        clean_title,
                         href
                     )
                 )
@@ -250,89 +174,55 @@ def search_web(query):
         return results
 
     except Exception:
-
         return []
 
 
-# =========================================================
-# قراءة الملفات
-# =========================================================
-
 def read_file(uploaded):
-
     if uploaded is None:
         return ""
 
     name = uploaded.name.lower()
-
     data = uploaded.getvalue()
 
     try:
-
         if name.endswith(".txt"):
-
             return data.decode(
                 "utf-8",
                 errors="ignore"
             )
 
-
         if name.endswith(".pdf"):
-
             from pypdf import PdfReader
 
             reader = PdfReader(
                 io.BytesIO(data)
             )
 
-            text_parts = []
-
-            for page in reader.pages:
-
-                text_parts.append(
-                    page.extract_text() or ""
-                )
-
             return "\n".join(
-                text_parts
+                page.extract_text() or ""
+                for page in reader.pages
             )
 
-
         if name.endswith(".docx"):
-
             from docx import Document
 
             document = Document(
                 io.BytesIO(data)
             )
 
-            text_parts = []
-
-            for paragraph in document.paragraphs:
-
-                if paragraph.text:
-
-                    text_parts.append(
-                        paragraph.text
-                    )
-
             return "\n".join(
-                text_parts
+                paragraph.text
+                for paragraph in document.paragraphs
+                if paragraph.text
             )
 
     except Exception:
-
         return ""
 
     return ""
 
 
-# =========================================================
-# تحويل الصوت إلى نص
-# =========================================================
-
-def speech_to_text(audio):
-
+def audio_to_text(audio):
     recognizer = sr.Recognizer()
 
     audio_buffer = io.BytesIO(
@@ -343,23 +233,19 @@ def speech_to_text(audio):
         audio_buffer
     ) as source:
 
-        audio_data = recognizer.record(
+        data = recognizer.record(
             source
         )
 
     return recognizer.recognize_google(
-        audio_data,
+        data,
         language="ar-EG"
     )
 
 
-# =========================================================
-# سؤال Yosef AI
-# =========================================================
-
 def ask_yosef(
     text,
-    extra_content=None
+    extra=None
 ):
 
     content = [
@@ -369,15 +255,8 @@ def ask_yosef(
         }
     ]
 
-
-    if extra_content:
-
-        content.extend(
-            extra_content
-        )
-
-
-    # البحث
+    if extra:
+        content.extend(extra)
 
     if needs_web_search(text):
 
@@ -405,9 +284,6 @@ def ask_yosef(
                 }
             )
 
-
-    # تاريخ المحادثة
-
     api_messages = [
         {
             "role": "system",
@@ -415,5 +291,185 @@ def ask_yosef(
         }
     ]
 
+    for message in st.session_state.messages[-20:]:
 
-    for message in
+        api_messages.append(
+            {
+                "role": message["role"],
+                "content": message["content"]
+            }
+        )
+
+    api_messages.append(
+        {
+            "role": "user",
+            "content": content
+        }
+    )
+
+    try:
+
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=api_messages,
+            max_tokens=800
+        )
+
+        answer = (
+            response
+            .choices[0]
+            .message
+            .content
+        )
+
+        if not answer:
+            return "لم أتمكن من إنشاء رد."
+
+        return answer
+
+    except Exception as error:
+
+        error_text = str(error)
+
+        if (
+            "429" in error_text
+            or "free-models-per-day" in error_text
+        ):
+
+            st.warning(
+                "⏳ الحد المجاني في OpenRouter انتهى حاليًا."
+            )
+
+            st.info(
+                "جرّب مرة أخرى بعد تجدد الحد المجاني."
+            )
+
+        else:
+
+            st.error(
+                "❌ حصل خطأ أثناء تشغيل Yosef AI."
+            )
+
+        return None
+
+
+for message in st.session_state.messages:
+
+    with st.chat_message(
+        message["role"]
+    ):
+
+        st.markdown(
+            message["content"]
+        )
+
+
+st.markdown("### 📎 صورة أو ملف")
+
+uploaded_file = st.file_uploader(
+    "اختار صورة أو ملف",
+    type=[
+        "png",
+        "jpg",
+        "jpeg",
+        "webp",
+        "txt",
+        "pdf",
+        "docx"
+    ]
+)
+
+if uploaded_file:
+
+    file_type = uploaded_file.type or ""
+
+    if file_type.startswith("image/"):
+
+        st.image(
+            uploaded_file,
+            caption=uploaded_file.name
+        )
+
+    else:
+
+        st.info(
+            "📎 " + uploaded_file.name
+        )
+
+
+st.markdown("### 🎙️ صوت")
+
+voice_audio = st.audio_input(
+    "سجل رسالتك من الميكروفون"
+)
+
+if voice_audio:
+
+    try:
+
+        with st.spinner(
+            "🎧 جاري فهم صوتك..."
+        ):
+
+            spoken_text = audio_to_text(
+                voice_audio
+            )
+
+        with st.spinner(
+            "🤖 Yosef AI بيفكر..."
+        ):
+
+            answer = ask_yosef(
+                spoken_text
+            )
+
+        if answer:
+
+            st.session_state.messages.append(
+                {
+                    "role": "user",
+                    "content": spoken_text
+                }
+            )
+
+            st.session_state.messages.append(
+                {
+                    "role": "assistant",
+                    "content": answer
+                }
+            )
+
+            st.rerun()
+
+    except sr.UnknownValueError:
+
+        st.error(
+            "❌ مش قادر أفهم التسجيل."
+        )
+
+    except sr.RequestError:
+
+        st.error(
+            "❌ خدمة التعرف على الصوت غير متاحة."
+        )
+
+    except Exception as error:
+
+        st.error(
+            "❌ حصل خطأ في الصوت: "
+            + str(error)
+        )
+
+
+st.markdown("### 💬 اكتب رسالتك")
+
+text = st.text_area(
+    "الرسالة",
+    placeholder="اكتب رسالتك هنا...",
+    height=100,
+    label_visibility="collapsed"
+)
+
+if st.button(
+    "إرسال ➤",
+   

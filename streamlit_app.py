@@ -56,13 +56,14 @@ if not OPENROUTER_KEY:
 # =========================================================
 
 if "messages" not in st.session_state:
-
     st.session_state.messages = []
 
-
 if "plan" not in st.session_state:
-
     st.session_state.plan = "Free"
+
+# المرفق الحالي
+if "attached_file" not in st.session_state:
+    st.session_state.attached_file = None
 
 # =========================================================
 # التصميم
@@ -75,7 +76,7 @@ st.markdown(
     .block-container {
         max-width: 900px;
         padding-top: 2rem;
-        padding-bottom: 5rem;
+        padding-bottom: 7rem;
     }
 
     .yosef-title {
@@ -97,6 +98,13 @@ st.markdown(
         text-align: center;
         margin-bottom: 15px;
         border: 1px solid #444;
+    }
+
+    .attachment-box {
+        padding: 10px;
+        border-radius: 12px;
+        border: 1px solid #444;
+        margin-bottom: 10px;
     }
 
     </style>
@@ -197,13 +205,11 @@ who is your developer
 def developer_question(text):
 
     if not text:
-
         return False
 
     text = text.lower().strip()
 
     words = [
-
         "مين مطورك",
         "مين المطور",
         "مين عملك",
@@ -231,11 +237,9 @@ def developer_question(text):
 def should_search(text):
 
     if not text:
-
         return False
 
     keywords = [
-
         "ابحث",
         "ابحثلي",
         "ابحث لي",
@@ -283,31 +287,20 @@ def web_search(query):
     try:
 
         response = requests.get(
-
             "https://api.duckduckgo.com/",
-
             params={
-
                 "q": query,
-
                 "format": "json",
-
                 "no_html": "1",
-
                 "skip_disambig": "1",
             },
-
             timeout=8,
-
             headers={
-
-                "User-Agent":
-                    "YosefAI/1.0"
+                "User-Agent": "YosefAI/1.0"
             },
         )
 
         if response.status_code != 200:
-
             return ""
 
         data = response.json()
@@ -320,10 +313,7 @@ def web_search(query):
         )
 
         if abstract:
-
-            results.append(
-                abstract
-            )
+            results.append(abstract)
 
         for item in data.get(
             "RelatedTopics",
@@ -331,13 +321,9 @@ def web_search(query):
         ):
 
             if len(results) >= 5:
-
                 break
 
-            if isinstance(
-                item,
-                dict
-            ):
+            if isinstance(item, dict):
 
                 text = item.get(
                     "Text",
@@ -345,17 +331,13 @@ def web_search(query):
                 )
 
                 if text:
-
-                    results.append(
-                        text
-                    )
+                    results.append(text)
 
         return "\n\n".join(
             results
         )[:6000]
 
     except Exception:
-
         return ""
 
 # =========================================================
@@ -397,14 +379,9 @@ def read_file(file):
                 )
 
                 if page_text:
+                    text.append(page_text)
 
-                    text.append(
-                        page_text
-                    )
-
-            return "\n".join(
-                text
-            )
+            return "\n".join(text)
 
         # DOCX
         if name.endswith(".docx"):
@@ -420,14 +397,11 @@ def read_file(file):
             for paragraph in doc.paragraphs:
 
                 if paragraph.text:
-
                     text.append(
                         paragraph.text
                     )
 
-            return "\n".join(
-                text
-            )
+            return "\n".join(text)
 
     except Exception as error:
 
@@ -448,12 +422,10 @@ def create_messages(
 ):
 
     messages = [
-
         {
             "role": "system",
             "content": SYSTEM_PROMPT
         }
-
     ]
 
     # ذاكرة آخر 8 رسائل
@@ -463,45 +435,29 @@ def create_messages(
     ):
 
         messages.append({
-
-            "role":
-                message["role"],
-
-            "content":
-                message["content"]
+            "role": message["role"],
+            "content": message["content"]
         })
 
     content = [
-
         {
             "type": "text",
-
             "text": (
-
                 user_text
-
                 if user_text
-
-                else
-                "حلل المحتوى المرفق."
+                else "حلل المحتوى المرفق."
             )
         }
-
     ]
 
     # صورة أو ملف
 
     if extra_content:
-
-        content.extend(
-            extra_content
-        )
+        content.extend(extra_content)
 
     # البحث
 
-    if should_search(
-        user_text
-    ):
+    if should_search(user_text):
 
         result = web_search(
             user_text
@@ -510,9 +466,7 @@ def create_messages(
         if result:
 
             content.append({
-
                 "type": "text",
-
                 "text": (
                     "هذه معلومات من البحث "
                     "على الإنترنت، استخدمها "
@@ -522,9 +476,7 @@ def create_messages(
             })
 
     messages.append({
-
         "role": "user",
-
         "content": content
     })
 
@@ -541,23 +493,18 @@ def ask_ai(
 
     # إجابة المطور مباشرة
 
-    if developer_question(
-        user_text
-    ):
+    if developer_question(user_text):
 
         return (
             "أنا Yosef AI، وتم تطويري بواسطة يوسف."
         )
 
     messages = create_messages(
-
         user_text,
-
         extra_content
     )
 
     headers = {
-
         "Authorization":
             f"Bearer {OPENROUTER_KEY}",
 
@@ -572,7 +519,6 @@ def ask_ai(
     }
 
     payload = {
-
         "model":
             MODEL,
 
@@ -589,25 +535,17 @@ def ask_ai(
     try:
 
         response = requests.post(
-
             OPENROUTER_URL,
-
             headers=headers,
-
             json=payload,
-
             timeout=90,
         )
-
-        # مفتاح خطأ
 
         if response.status_code == 401:
 
             return (
                 "❌ مفتاح OpenRouter غير صحيح."
             )
-
-        # الحد من OpenRouter نفسه
 
         if response.status_code == 429:
 
@@ -616,16 +554,12 @@ def ask_ai(
                 "من OpenRouter. حاول مرة أخرى."
             )
 
-        # السيرفر
-
         if response.status_code >= 500:
 
             return (
                 "⏳ خادم الذكاء مشغول حاليًا. "
                 "حاول مرة أخرى."
             )
-
-        # أخطاء أخرى
 
         if response.status_code != 200:
 
@@ -662,34 +596,20 @@ def ask_ai(
             )
 
         answer = (
-
             choices[0]
-
             .get("message", {})
-
             .get("content", "")
         )
 
-        # بعض النماذج قد ترجع List
-
-        if isinstance(
-            answer,
-            list
-        ):
+        if isinstance(answer, list):
 
             answer = "".join(
-
                 item.get(
                     "text",
                     ""
                 )
-
                 for item in answer
-
-                if isinstance(
-                    item,
-                    dict
-                )
+                if isinstance(item, dict)
             )
 
         if not answer:
@@ -698,9 +618,7 @@ def ask_ai(
                 "❌ النموذج لم يُرجع نصًا."
             )
 
-        return str(
-            answer
-        ).strip()
+        return str(answer).strip()
 
     except requests.exceptions.Timeout:
 
@@ -727,22 +645,15 @@ def ask_ai(
 # المحادثة القديمة
 # =========================================================
 
-for message in (
-    st.session_state.messages
-):
+for message in st.session_state.messages:
 
     role = message["role"]
 
     with st.chat_message(
-
         role,
-
         avatar=(
-
             "👤"
-
             if role == "user"
-
             else "🤖"
         )
     ):
@@ -760,22 +671,18 @@ col1, col2 = st.columns(2)
 with col1:
 
     if st.button(
-
         "🆕 محادثة جديدة",
-
         use_container_width=True
     ):
 
         st.session_state.messages = []
+        st.session_state.attached_file = None
 
         st.rerun()
 
 with col2:
 
-    if (
-        st.session_state.plan
-        == "Free"
-    ):
+    if st.session_state.plan == "Free":
 
         st.info(
             "🆓 استخدام مجاني"
@@ -802,11 +709,8 @@ with st.expander(
     if PRO_PAYMENT_URL:
 
         st.link_button(
-
             "💳 اشترك في Pro",
-
             PRO_PAYMENT_URL,
-
             use_container_width=True
         )
 
@@ -819,9 +723,7 @@ with st.expander(
     if PRO_CODE:
 
         code = st.text_input(
-
             "كود Pro",
-
             type="password"
         )
 
@@ -847,25 +749,119 @@ with st.expander(
                 )
 
 # =========================================================
+# زر المرفقات الجديد
+# =========================================================
+
+st.markdown(
+    "### 📎 المرفقات"
+)
+
+with st.popover(
+    "➕ إضافة صورة أو ملف",
+    width="stretch"
+):
+
+    st.markdown(
+        "### 📎 اختر نوع المرفق"
+    )
+
+    # الكاميرا
+
+    camera_photo = st.camera_input(
+        "📷 افتح الكاميرا والتقط صورة",
+        key="yosef_camera"
+    )
+
+    # الملفات والصور
+
+    uploaded_file = st.file_uploader(
+        "🖼️ الصور والملفات",
+        type=[
+            "png",
+            "jpg",
+            "jpeg",
+            "webp",
+            "txt",
+            "pdf",
+            "docx",
+        ],
+        accept_multiple_files=False,
+        key="yosef_uploader"
+    )
+
+    # اختيار الصورة من الكاميرا
+
+    selected_file = None
+
+    if camera_photo is not None:
+
+        selected_file = camera_photo
+
+    elif uploaded_file is not None:
+
+        selected_file = uploaded_file
+
+    if selected_file is not None:
+
+        file_bytes = selected_file.getvalue()
+
+        st.session_state.attached_file = {
+            "name": selected_file.name,
+            "type": selected_file.type or "",
+            "data": file_bytes,
+        }
+
+        st.success(
+            "✅ تم تجهيز المرفق: "
+            + selected_file.name
+        )
+
+# =========================================================
+# عرض المرفق الحالي
+# =========================================================
+
+attached = st.session_state.attached_file
+
+if attached:
+
+    st.markdown(
+        '<div class="attachment-box">',
+        unsafe_allow_html=True
+    )
+
+    st.write(
+        "📎 المرفق الحالي:",
+        attached["name"]
+    )
+
+    if attached["type"].startswith("image/"):
+
+        st.image(
+            attached["data"],
+            use_container_width=True
+        )
+
+    if st.button(
+        "🗑️ إزالة المرفق",
+        key="remove_attachment",
+        use_container_width=True
+    ):
+
+        st.session_state.attached_file = None
+
+        st.rerun()
+
+    st.markdown(
+        "</div>",
+        unsafe_allow_html=True
+    )
+
+# =========================================================
 # الإدخال
 # =========================================================
 
 prompt = st.chat_input(
-
-    "اكتب رسالتك...",
-
-    accept_file=True,
-
-    file_type=[
-
-        "png",
-        "jpg",
-        "jpeg",
-        "webp",
-        "txt",
-        "pdf",
-        "docx",
-    ],
+    "اكتب رسالتك..."
 )
 
 # =========================================================
@@ -874,46 +870,29 @@ prompt = st.chat_input(
 
 if prompt:
 
-    user_text = (
-        prompt.text
-        or ""
-    )
-
-    uploaded_file = None
-
-    if prompt.files:
-
-        uploaded_file = (
-            prompt.files[0]
-        )
+    user_text = prompt.strip()
 
     extra_content = []
 
+    attached = st.session_state.attached_file
+
     # =====================================================
-    # الصورة / الملف
+    # معالجة المرفق
     # =====================================================
 
-    if uploaded_file:
+    if attached:
 
-        file_type = (
-            uploaded_file.type
-            or ""
-        )
+        file_type = attached["type"]
+        file_data = attached["data"]
+        file_name = attached["name"]
 
         # صورة
 
-        if file_type.startswith(
-            "image/"
-        ):
-
-            image_data = (
-                uploaded_file
-                .getvalue()
-            )
+        if file_type.startswith("image/"):
 
             encoded = (
                 base64.b64encode(
-                    image_data
+                    file_data
                 )
                 .decode("utf-8")
             )
@@ -934,8 +913,28 @@ if prompt:
 
         else:
 
+            class MemoryFile:
+
+                def __init__(
+                    self,
+                    name,
+                    data
+                ):
+
+                    self.name = name
+                    self._data = data
+
+                def getvalue(self):
+
+                    return self._data
+
+            temp_file = MemoryFile(
+                file_name,
+                file_data
+            )
+
             file_text = read_file(
-                uploaded_file
+                temp_file
             )
 
             if file_text:
@@ -955,9 +954,7 @@ if prompt:
     # =====================================================
 
     with st.chat_message(
-
         "user",
-
         avatar="👤"
     ):
 
@@ -967,28 +964,22 @@ if prompt:
                 user_text
             )
 
-        if uploaded_file:
+        if attached:
 
-            if (
-
-                uploaded_file.type
-
-                and
-
-                uploaded_file.type.startswith(
-                    "image/"
-                )
+            if attached["type"].startswith(
+                "image/"
             ):
 
                 st.image(
-                    uploaded_file
+                    attached["data"],
+                    use_container_width=True
                 )
 
             else:
 
                 st.caption(
                     "📎 "
-                    + uploaded_file.name
+                    + attached["name"]
                 )
 
     # =====================================================
@@ -996,9 +987,7 @@ if prompt:
     # =====================================================
 
     with st.chat_message(
-
         "assistant",
-
         avatar="🤖"
     ):
 
@@ -1007,9 +996,7 @@ if prompt:
         ):
 
             answer = ask_ai(
-
                 user_text,
-
                 extra_content
             )
 
@@ -1018,7 +1005,7 @@ if prompt:
         )
 
     # =====================================================
-    # حفظ
+    # حفظ المحادثة
     # =====================================================
 
     st.session_state.messages.append({
@@ -1038,3 +1025,11 @@ if prompt:
         "content":
             answer
     })
+
+    # =====================================================
+    # إزالة المرفق بعد الإرسال
+    # =====================================================
+
+    st.session_state.attached_file = None
+
+    st.rerun()

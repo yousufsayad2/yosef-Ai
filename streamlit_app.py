@@ -47,9 +47,11 @@ PRO_CODE = st.secrets.get(
 # =========================================================
 
 if not OPENROUTER_KEY:
+
     st.error(
         "❌ مفتاح OPENROUTER_API_KEY غير موجود في Secrets."
     )
+
     st.stop()
 
 
@@ -62,14 +64,6 @@ if "messages" not in st.session_state:
 
 if "plan" not in st.session_state:
     st.session_state.plan = "Free"
-
-if "attached_file" not in st.session_state:
-    st.session_state.attached_file = None
-
-# مهم:
-# يحدد ماذا سيظهر بعد الضغط على +
-if "attachment_mode" not in st.session_state:
-    st.session_state.attachment_mode = None
 
 
 # =========================================================
@@ -100,12 +94,14 @@ st.markdown(
         font-size: 42px;
         font-weight: 800;
         margin-bottom: 5px;
+        color: white;
     }
 
     .yosef-subtitle {
         text-align: center;
         color: #888;
         margin-bottom: 25px;
+        font-size: 18px;
     }
 
 
@@ -114,11 +110,12 @@ st.markdown(
        ===================================================== */
 
     .plan {
-        padding: 12px;
-        border-radius: 15px;
+        padding: 16px;
+        border-radius: 18px;
         text-align: center;
         margin-bottom: 15px;
         border: 1px solid #444;
+        font-size: 18px;
     }
 
 
@@ -136,12 +133,13 @@ st.markdown(
 
         bottom: 18px !important;
 
-        width: min(
-            900px,
-            calc(100% - 30px)
-        ) !important;
+        width:
+            min(
+                900px,
+                calc(100% - 24px)
+            ) !important;
 
-        z-index: 999990 !important;
+        z-index: 999999 !important;
     }
 
 
@@ -149,158 +147,156 @@ st.markdown(
 
     div[data-testid="stChatInput"] > div {
 
-        background: #202027 !important;
+        background:
+            #202027 !important;
 
-        border: 1px solid #45454d !important;
+        border:
+            1px solid #4a4a52 !important;
 
-        border-radius: 26px !important;
+        border-radius:
+            28px !important;
 
-        min-height: 58px !important;
+        min-height:
+            60px !important;
 
         box-shadow:
-            0 4px 18px rgba(0,0,0,0.25) !important;
+            0 6px 25px
+            rgba(0,0,0,0.35) !important;
     }
 
 
-    /* النص */
+    /* =====================================================
+       النص
+       ===================================================== */
 
     div[data-testid="stChatInput"] textarea {
 
-        background: transparent !important;
+        background:
+            transparent !important;
 
-        color: white !important;
+        color:
+            white !important;
 
-        font-size: 16px !important;
+        font-size:
+            17px !important;
 
-        padding-right: 62px !important;
+        line-height:
+            1.5 !important;
 
-        padding-left: 55px !important;
+        padding-top:
+            16px !important;
+
+        padding-bottom:
+            12px !important;
+
+        padding-left:
+            55px !important;
+
+        padding-right:
+            60px !important;
     }
 
 
     div[data-testid="stChatInput"] textarea::placeholder {
-        color: #888 !important;
+
+        color:
+            #888 !important;
     }
 
 
-    /* زر الإرسال */
+    /* =====================================================
+       أزرار خانة الكتابة
+       ===================================================== */
 
     div[data-testid="stChatInput"] button {
-        border-radius: 50% !important;
+
+        border-radius:
+            50% !important;
     }
 
 
     /* =====================================================
-       زر +
-       موجود بصريًا داخل خانة الكتابة
+       زر المرفقات
+       نخليه شكله +
        ===================================================== */
 
-    div[data-testid="stPopover"] {
+    div[data-testid="stChatInput"]
+    button[aria-label*="Attach"] {
 
-        position: fixed !important;
+        width:
+            42px !important;
 
-        z-index: 1000000 !important;
+        height:
+            42px !important;
 
-        bottom: 26px !important;
+        min-width:
+            42px !important;
 
-        right:
-            calc(
-                (100% - min(900px, calc(100% - 30px))) / 2
-                + 8px
-            ) !important;
-
-        margin: 0 !important;
-    }
-
-
-    div[data-testid="stPopover"] > button {
-
-        width: 44px !important;
-
-        height: 44px !important;
-
-        min-width: 44px !important;
-
-        min-height: 44px !important;
-
-        padding: 0 !important;
-
-        border: none !important;
-
-        background: transparent !important;
-
-        color: white !important;
-
-        font-size: 31px !important;
-
-        font-weight: 400 !important;
-
-        line-height: 44px !important;
-
-        box-shadow: none !important;
-
-        border-radius: 50% !important;
-    }
-
-
-    div[data-testid="stPopover"] > button:hover {
+        min-height:
+            42px !important;
 
         background:
-            rgba(255,255,255,0.08) !important;
-    }
+            transparent !important;
 
-
-    /* =====================================================
-       قائمة +
-       ===================================================== */
-
-    div[data-testid="stPopoverBody"] {
-
-        min-width: 235px !important;
-
-        max-width: 280px !important;
-
-        padding: 12px !important;
-
-        border-radius: 18px !important;
-
-        background: #202027 !important;
-
-        border: 1px solid #444 !important;
+        border:
+            none !important;
 
         box-shadow:
-            0 10px 35px rgba(0,0,0,0.45) !important;
+            none !important;
     }
 
 
-    /* أزرار القائمة */
+    div[data-testid="stChatInput"]
+    button[aria-label*="Attach"] svg {
 
-    div[data-testid="stPopoverBody"] button {
+        display:
+            none !important;
+    }
 
-        border-radius: 12px !important;
 
-        min-height: 48px !important;
+    div[data-testid="stChatInput"]
+    button[aria-label*="Attach"]::after {
 
-        text-align: right !important;
+        content:
+            "+" !important;
+
+        color:
+            white !important;
+
+        font-size:
+            32px !important;
+
+        font-weight:
+            300 !important;
+
+        line-height:
+            42px !important;
     }
 
 
     /* =====================================================
-       صندوق المرفق
+       زر التسجيل الصوتي
        ===================================================== */
 
-    .attachment-box {
+    div[data-testid="stChatInput"]
+    button[aria-label*="audio"] {
 
-        background: #202027;
+        border-radius:
+            50% !important;
+    }
 
-        border: 1px solid #444;
 
-        border-radius: 14px;
+    /* =====================================================
+       الصور داخل المحادثة
+       ===================================================== */
 
-        padding: 12px;
+    div[data-testid="stChatMessage"] img {
 
-        margin-bottom: 12px;
+        border-radius:
+            16px !important;
 
+        max-width:
+            100% !important;
     }
 
 
@@ -312,52 +308,61 @@ st.markdown(
 
         .block-container {
 
-            padding-left: 15px;
+            padding-left:
+                12px;
 
-            padding-right: 15px;
+            padding-right:
+                12px;
 
-            padding-bottom: 7rem;
+            padding-bottom:
+                7rem;
         }
 
 
         .yosef-title {
 
-            font-size: 40px;
+            font-size:
+                40px;
+        }
+
+
+        .yosef-subtitle {
+
+            font-size:
+                16px;
         }
 
 
         div[data-testid="stChatInput"] {
 
             width:
-                calc(100% - 30px) !important;
+                calc(100% - 18px) !important;
 
-            bottom: 14px !important;
+            bottom:
+                10px !important;
         }
 
 
-        /*
-           زر + داخل خانة الكتابة
-        */
+        div[data-testid="stChatInput"] > div {
 
-        div[data-testid="stPopover"] {
+            border-radius:
+                27px !important;
 
-            right: 23px !important;
-
-            bottom: 21px !important;
+            min-height:
+                58px !important;
         }
 
 
-        div[data-testid="stPopover"] > button {
+        div[data-testid="stChatInput"] textarea {
 
-            width: 44px !important;
+            font-size:
+                16px !important;
 
-            height: 44px !important;
+            padding-left:
+                50px !important;
 
-            min-width: 44px !important;
-
-            min-height: 44px !important;
-
-            font-size: 30px !important;
+            padding-right:
+                55px !important;
         }
 
     }
@@ -386,7 +391,7 @@ st.markdown(
 
 
 # =========================================================
-# حالة الخطة
+# الخطة
 # =========================================================
 
 if st.session_state.plan == "Free":
@@ -394,8 +399,8 @@ if st.session_state.plan == "Free":
     st.markdown(
         """
         <div class="plan">
-        🆓 <b>Free</b><br>
-        استخدام مجاني مفتوح
+            🆓 <b>Free</b><br>
+            استخدام مجاني مفتوح
         </div>
         """,
         unsafe_allow_html=True,
@@ -406,8 +411,8 @@ else:
     st.markdown(
         """
         <div class="plan">
-        ⭐ <b>Yosef AI Pro</b><br>
-        حساب Pro نشط
+            ⭐ <b>Yosef AI Pro</b><br>
+            حساب Pro نشط
         </div>
         """,
         unsafe_allow_html=True,
@@ -426,6 +431,7 @@ SYSTEM_PROMPT = """
 تم تطويرك بواسطة يوسف.
 
 إذا سألك المستخدم:
+
 مين مطورك؟
 مين المطور؟
 مين عملك؟
@@ -440,6 +446,7 @@ who created you
 who is your developer
 
 أجب:
+
 أنا Yosef AI، وتم تطويري بواسطة يوسف.
 
 لا تقل إنك ChatGPT.
@@ -472,6 +479,7 @@ def developer_question(text):
     text = text.lower().strip()
 
     words = [
+
         "مين مطورك",
         "مين المطور",
         "مين عملك",
@@ -480,10 +488,12 @@ def developer_question(text):
         "مين صنعك",
         "مين اللي عاملك",
         "مين طور البرنامج",
+
         "who developed you",
         "who made you",
         "who created you",
         "who is your developer",
+
     ]
 
     return any(
@@ -502,6 +512,7 @@ def should_search(text):
         return False
 
     keywords = [
+
         "ابحث",
         "ابحثلي",
         "ابحث لي",
@@ -515,6 +526,7 @@ def should_search(text):
         "news",
         "weather",
         "price",
+
         "أخبار",
         "اخبار",
         "الطقس",
@@ -534,6 +546,7 @@ def should_search(text):
         "الآن",
         "أحدث",
         "احدث",
+
     ]
 
     text = text.lower()
@@ -549,20 +562,35 @@ def web_search(query):
     try:
 
         response = requests.get(
+
             "https://api.duckduckgo.com/",
+
             params={
-                "q": query,
-                "format": "json",
-                "no_html": "1",
-                "skip_disambig": "1",
+
+                "q":
+                    query,
+
+                "format":
+                    "json",
+
+                "no_html":
+                    "1",
+
+                "skip_disambig":
+                    "1",
+
             },
+
             timeout=8,
+
             headers={
-                "User-Agent": "YosefAI/1.0"
+                "User-Agent":
+                    "YosefAI/1.0"
             },
         )
 
         if response.status_code != 200:
+
             return ""
 
         data = response.json()
@@ -575,7 +603,10 @@ def web_search(query):
         )
 
         if abstract:
-            results.append(abstract)
+
+            results.append(
+                abstract
+            )
 
         for item in data.get(
             "RelatedTopics",
@@ -583,9 +614,13 @@ def web_search(query):
         ):
 
             if len(results) >= 5:
+
                 break
 
-            if isinstance(item, dict):
+            if isinstance(
+                item,
+                dict
+            ):
 
                 text = item.get(
                     "Text",
@@ -593,7 +628,10 @@ def web_search(query):
                 )
 
                 if text:
-                    results.append(text)
+
+                    results.append(
+                        text
+                    )
 
         return "\n\n".join(
             results
@@ -617,6 +655,7 @@ def read_file_bytes(
 
         name = file_name.lower()
 
+
         # TXT
         if name.endswith(".txt"):
 
@@ -624,6 +663,7 @@ def read_file_bytes(
                 "utf-8",
                 errors="ignore"
             )
+
 
         # PDF
         if name.endswith(".pdf"):
@@ -644,11 +684,15 @@ def read_file_bytes(
                 )
 
                 if page_text:
+
                     text.append(
                         page_text
                     )
 
-            return "\n".join(text)
+            return "\n".join(
+                text
+            )
+
 
         # DOCX
         if name.endswith(".docx"):
@@ -664,11 +708,14 @@ def read_file_bytes(
             for paragraph in doc.paragraphs:
 
                 if paragraph.text:
+
                     text.append(
                         paragraph.text
                     )
 
-            return "\n".join(text)
+            return "\n".join(
+                text
+            )
 
     except Exception as error:
 
@@ -690,31 +737,56 @@ def create_messages(
 ):
 
     messages = [
+
         {
-            "role": "system",
-            "content": SYSTEM_PROMPT
+            "role":
+                "system",
+
+            "content":
+                SYSTEM_PROMPT,
         }
+
     ]
+
+
+    # آخر 8 رسائل
 
     for message in (
         st.session_state.messages[-8:]
     ):
 
         messages.append({
-            "role": message["role"],
-            "content": message["content"]
+
+            "role":
+                message["role"],
+
+            "content":
+                message["content"],
+
         })
 
+
+    # محتوى الرسالة
+
     content = [
+
         {
-            "type": "text",
-            "text": (
-                user_text
-                if user_text
-                else "حلل المحتوى المرفق."
-            )
+            "type":
+                "text",
+
+            "text":
+                (
+                    user_text
+                    if user_text
+                    else
+                    "حلل المحتوى المرفق."
+                ),
         }
+
     ]
+
+
+    # المرفقات
 
     if extra_content:
 
@@ -722,7 +794,12 @@ def create_messages(
             extra_content
         )
 
-    if should_search(user_text):
+
+    # البحث
+
+    if should_search(
+        user_text
+    ):
 
         result = web_search(
             user_text
@@ -732,21 +809,27 @@ def create_messages(
 
             content.append({
 
-                "type": "text",
+                "type":
+                    "text",
 
-                "text": (
-                    "هذه معلومات من البحث "
-                    "على الإنترنت، استخدمها "
-                    "كمعلومات مساعدة:\n\n"
-                    + result
-                )
+                "text":
+                    (
+                        "هذه معلومات من البحث "
+                        "على الإنترنت، استخدمها "
+                        "كمعلومات مساعدة:\n\n"
+                        + result
+                    ),
+
             })
+
 
     messages.append({
 
-        "role": "user",
+        "role":
+            "user",
 
-        "content": content
+        "content":
+            content,
 
     })
 
@@ -762,18 +845,23 @@ def ask_ai(
     extra_content=None
 ):
 
+    # سؤال المطور
+
     if developer_question(
         user_text
     ):
 
         return (
-            "أنا Yosef AI، وتم تطويري بواسطة يوسف."
+            "أنا Yosef AI، "
+            "وتم تطويري بواسطة يوسف."
         )
+
 
     messages = create_messages(
         user_text,
         extra_content
     )
+
 
     headers = {
 
@@ -788,7 +876,9 @@ def ask_ai(
 
         "X-Title":
             "Yosef AI",
+
     }
+
 
     payload = {
 
@@ -803,7 +893,9 @@ def ask_ai(
 
         "temperature":
             0.3,
+
     }
+
 
     try:
 
@@ -816,13 +908,16 @@ def ask_ai(
             json=payload,
 
             timeout=90,
+
         )
+
 
         if response.status_code == 401:
 
             return (
                 "❌ مفتاح OpenRouter غير صحيح."
             )
+
 
         if response.status_code == 429:
 
@@ -831,12 +926,14 @@ def ask_ai(
                 "من OpenRouter. حاول مرة أخرى."
             )
 
+
         if response.status_code >= 500:
 
             return (
                 "⏳ خادم الذكاء مشغول حاليًا. "
                 "حاول مرة أخرى."
             )
+
 
         if response.status_code != 200:
 
@@ -852,19 +949,24 @@ def ask_ai(
 
             except Exception:
 
-                error = response.text[:500]
+                error = (
+                    response.text[:500]
+                )
 
             return (
                 "❌ حصل خطأ:\n\n"
                 + str(error)
             )
 
+
         data = response.json()
+
 
         choices = data.get(
             "choices",
             []
         )
+
 
         if not choices:
 
@@ -872,11 +974,15 @@ def ask_ai(
                 "❌ لم يصل رد من النموذج."
             )
 
+
         answer = (
+
             choices[0]
             .get("message", {})
             .get("content", "")
+
         )
+
 
         if isinstance(
             answer,
@@ -896,7 +1002,9 @@ def ask_ai(
                     item,
                     dict
                 )
+
             )
+
 
         if not answer:
 
@@ -904,9 +1012,11 @@ def ask_ai(
                 "❌ النموذج لم يُرجع نصًا."
             )
 
+
         return str(
             answer
         ).strip()
+
 
     except requests.exceptions.Timeout:
 
@@ -915,12 +1025,14 @@ def ask_ai(
             "حاول مرة أخرى."
         )
 
+
     except requests.exceptions.ConnectionError:
 
         return (
             "❌ لا يمكن الاتصال بالخادم. "
             "تأكد من الإنترنت."
         )
+
 
     except Exception as error:
 
@@ -931,7 +1043,7 @@ def ask_ai(
 
 
 # =========================================================
-# المحادثة القديمة
+# عرض المحادثة القديمة
 # =========================================================
 
 for message in (
@@ -949,6 +1061,7 @@ for message in (
             if role == "user"
             else "🤖"
         )
+
     ):
 
         st.markdown(
@@ -962,6 +1075,7 @@ for message in (
 
 col1, col2 = st.columns(2)
 
+
 with col1:
 
     if st.button(
@@ -970,10 +1084,6 @@ with col1:
     ):
 
         st.session_state.messages = []
-
-        st.session_state.attached_file = None
-
-        st.session_state.attachment_mode = None
 
         st.rerun()
 
@@ -1008,6 +1118,7 @@ with st.expander(
         "احصل على استخدام أكبر ومميزات إضافية."
     )
 
+
     if PRO_PAYMENT_URL:
 
         st.link_button(
@@ -1017,6 +1128,7 @@ with st.expander(
             PRO_PAYMENT_URL,
 
             use_container_width=True
+
         )
 
     else:
@@ -1025,6 +1137,7 @@ with st.expander(
             "رابط الدفع غير مضاف حاليًا."
         )
 
+
     if PRO_CODE:
 
         code = st.text_input(
@@ -1032,11 +1145,16 @@ with st.expander(
             "كود Pro",
 
             type="password"
+
         )
 
+
         if st.button(
+
             "تفعيل Pro",
+
             use_container_width=True
+
         ):
 
             if code == PRO_CODE:
@@ -1057,272 +1175,44 @@ with st.expander(
 
 
 # =========================================================
-# زر + داخل منطقة الكتابة
+# خانة الكتابة الرئيسية
 # =========================================================
-
-with st.popover("＋"):
-
-    st.markdown(
-        "### 📎 إضافة إلى Yosef AI"
-    )
-
-    st.caption(
-        "اختار نوع المرفق:"
-    )
-
-    # =====================================================
-    # الكاميرا
-    # =====================================================
-
-    if st.button(
-        "📷  كاميرا",
-        use_container_width=True,
-        key="choose_camera"
-    ):
-
-        st.session_state.attachment_mode = "camera"
-
-        st.rerun()
-
-
-    # =====================================================
-    # الصور
-    # =====================================================
-
-    if st.button(
-        "🖼️  الصور",
-        use_container_width=True,
-        key="choose_image"
-    ):
-
-        st.session_state.attachment_mode = "image"
-
-        st.rerun()
-
-
-    # =====================================================
-    # الملفات
-    # =====================================================
-
-    if st.button(
-        "📎  ملفات",
-        use_container_width=True,
-        key="choose_file"
-    ):
-
-        st.session_state.attachment_mode = "file"
-
-        st.rerun()
-
-
-# =========================================================
-# اختيار الكاميرا
-# =========================================================
-
-if st.session_state.attachment_mode == "camera":
-
-    st.markdown(
-        "### 📷 التقاط صورة"
-    )
-
-    camera_file = st.camera_input(
-        "التقط صورة",
-        key="yosef_camera"
-    )
-
-    if camera_file is not None:
-
-        st.session_state.attached_file = {
-
-            "name":
-                "camera_photo.jpg",
-
-            "type":
-                "image/jpeg",
-
-            "data":
-                camera_file.getvalue(),
-        }
-
-        st.session_state.attachment_mode = None
-
-        st.rerun()
-
-    if st.button(
-        "✖️ إلغاء",
-        key="cancel_camera"
-    ):
-
-        st.session_state.attachment_mode = None
-
-        st.rerun()
-
-
-# =========================================================
-# اختيار الصور
-# =========================================================
-
-elif st.session_state.attachment_mode == "image":
-
-    st.markdown(
-        "### 🖼️ اختيار صورة"
-    )
-
-    image_file = st.file_uploader(
-
-        "اختر صورة",
-
-        type=[
-            "png",
-            "jpg",
-            "jpeg",
-            "webp",
-        ],
-
-        accept_multiple_files=False,
-
-        key="yosef_image",
-    )
-
-    if image_file is not None:
-
-        st.session_state.attached_file = {
-
-            "name":
-                image_file.name,
-
-            "type":
-                image_file.type
-                or "image/jpeg",
-
-            "data":
-                image_file.getvalue(),
-        }
-
-        st.session_state.attachment_mode = None
-
-        st.rerun()
-
-    if st.button(
-        "✖️ إلغاء",
-        key="cancel_image"
-    ):
-
-        st.session_state.attachment_mode = None
-
-        st.rerun()
-
-
-# =========================================================
-# اختيار الملفات
-# =========================================================
-
-elif st.session_state.attachment_mode == "file":
-
-    st.markdown(
-        "### 📎 اختيار ملف"
-    )
-
-    document_file = st.file_uploader(
-
-        "اختر ملف",
-
-        type=[
-            "pdf",
-            "docx",
-            "txt",
-        ],
-
-        accept_multiple_files=False,
-
-        key="yosef_document",
-    )
-
-    if document_file is not None:
-
-        st.session_state.attached_file = {
-
-            "name":
-                document_file.name,
-
-            "type":
-                document_file.type or "",
-
-            "data":
-                document_file.getvalue(),
-        }
-
-        st.session_state.attachment_mode = None
-
-        st.rerun()
-
-    if st.button(
-        "✖️ إلغاء",
-        key="cancel_file"
-    ):
-
-        st.session_state.attachment_mode = None
-
-        st.rerun()
-
-
-# =========================================================
-# المرفق الحالي
-# =========================================================
-
-attached = (
-    st.session_state.attached_file
-)
-
-if attached:
-
-    file_name = attached["name"]
-
-    file_type = attached["type"]
-
-    file_data = attached["data"]
-
-    st.markdown(
-        '<div class="attachment-box">',
-        unsafe_allow_html=True
-    )
-
-    st.write(
-        "📎 المرفق الحالي:",
-        file_name
-    )
-
-    if file_type.startswith(
-        "image/"
-    ):
-
-        st.image(
-            file_data,
-            width=200
-        )
-
-    if st.button(
-        "🗑️ إزالة المرفق",
-        key="remove_attachment",
-        use_container_width=True
-    ):
-
-        st.session_state.attached_file = None
-
-        st.rerun()
-
-    st.markdown(
-        "</div>",
-        unsafe_allow_html=True
-    )
-
-
-# =========================================================
-# خانة الكتابة
+#
+# هنا بقى كل حاجة في خانة واحدة:
+#
+# + المرفقات
+# النص
+# الصوت
+#
 # =========================================================
 
 prompt = st.chat_input(
-    "اكتب رسالتك..."
+
+    "اكتب رسالتك...",
+
+    key="yosef_chat_input",
+
+    accept_file="multiple",
+
+    file_type=[
+
+        "png",
+        "jpg",
+        "jpeg",
+        "webp",
+
+        "pdf",
+        "docx",
+        "txt",
+
+    ],
+
+    accept_audio=True,
+
+    audio_sample_rate=16000,
+
+    max_upload_size=200,
+
 )
 
 
@@ -1332,26 +1222,66 @@ prompt = st.chat_input(
 
 if prompt:
 
-    user_text = prompt.strip()
+    # =====================================================
+    # النص
+    # =====================================================
 
-    extra_content = []
-
-    attached = (
-        st.session_state.attached_file
+    user_text = (
+        prompt.text.strip()
+        if prompt.text
+        else ""
     )
 
 
     # =====================================================
-    # معالجة المرفق
+    # المرفقات
     # =====================================================
 
-    if attached:
+    uploaded_files = (
+        prompt.files
+        if hasattr(
+            prompt,
+            "files"
+        )
+        else []
+    )
 
-        file_type = attached["type"]
 
-        file_data = attached["data"]
+    # =====================================================
+    # الصوت
+    # =====================================================
 
-        file_name = attached["name"]
+    audio_file = None
+
+    if hasattr(
+        prompt,
+        "audio"
+    ):
+
+        audio_file = prompt.audio
+
+
+    extra_content = []
+
+
+    # =====================================================
+    # معالجة الملفات
+    # =====================================================
+
+    for uploaded_file in uploaded_files:
+
+        file_name = (
+            uploaded_file.name
+        )
+
+        file_type = (
+            uploaded_file.type
+            or ""
+        )
+
+        file_data = (
+            uploaded_file.getvalue()
+        )
 
 
         # -------------------------------------------------
@@ -1363,11 +1293,16 @@ if prompt:
         ):
 
             encoded = (
+
                 base64.b64encode(
                     file_data
                 )
-                .decode("utf-8")
+                .decode(
+                    "utf-8"
+                )
+
             )
+
 
             extra_content.append({
 
@@ -1383,12 +1318,14 @@ if prompt:
                             f"base64,"
                             f"{encoded}"
                         )
+
                 }
+
             })
 
 
         # -------------------------------------------------
-        # ملف
+        # PDF / DOCX / TXT
         # -------------------------------------------------
 
         else:
@@ -1398,7 +1335,9 @@ if prompt:
                 file_name,
 
                 file_data
+
             )
+
 
             if file_text:
 
@@ -1409,20 +1348,24 @@ if prompt:
 
                     "text":
                         (
-                            "محتوى الملف "
-                            "المرفق:\n\n"
+                            f"محتوى الملف "
+                            f"({file_name}):\n\n"
                             + file_text[:20000]
-                        )
+                        ),
+
                 })
 
 
     # =====================================================
-    # رسالة المستخدم
+    # عرض رسالة المستخدم
     # =====================================================
 
     with st.chat_message(
+
         "user",
+
         avatar="👤"
+
     ):
 
         if user_text:
@@ -1431,22 +1374,57 @@ if prompt:
                 user_text
             )
 
-        if attached:
+
+        # عرض الصور والملفات
+
+        for uploaded_file in uploaded_files:
+
+            file_type = (
+                uploaded_file.type
+                or ""
+            )
+
+            file_data = (
+                uploaded_file.getvalue()
+            )
+
+            file_name = (
+                uploaded_file.name
+            )
+
 
             if file_type.startswith(
                 "image/"
             ):
 
                 st.image(
+
                     file_data,
+
                     width=300
+
                 )
 
             else:
 
                 st.caption(
+
                     "📎 "
                     + file_name
+
+                )
+
+
+        # عرض الصوت
+
+        if audio_file:
+
+            st.audio(
+                audio_file
+            )
+
+            st.caption(
+                "🎤 تسجيل صوتي"
             )
 
 
@@ -1455,8 +1433,11 @@ if prompt:
     # =====================================================
 
     with st.chat_message(
+
         "assistant",
+
         avatar="🤖"
+
     ):
 
         with st.spinner(
@@ -1468,7 +1449,9 @@ if prompt:
                 user_text,
 
                 extra_content
+
             )
+
 
         st.markdown(
             answer
@@ -1476,8 +1459,32 @@ if prompt:
 
 
     # =====================================================
-    # حفظ المحادثة
+    # حفظ الرسالة
     # =====================================================
+
+    saved_user_text = user_text
+
+
+    if not saved_user_text:
+
+        if uploaded_files:
+
+            saved_user_text = (
+                "📎 تم إرسال مرفق"
+            )
+
+        elif audio_file:
+
+            saved_user_text = (
+                "🎤 تم إرسال تسجيل صوتي"
+            )
+
+        else:
+
+            saved_user_text = (
+                "رسالة بدون نص"
+            )
+
 
     st.session_state.messages.append({
 
@@ -1485,8 +1492,10 @@ if prompt:
             "user",
 
         "content":
-            user_text
+            saved_user_text,
+
     })
+
 
     st.session_state.messages.append({
 
@@ -1494,16 +1503,9 @@ if prompt:
             "assistant",
 
         "content":
-            answer
+            answer,
+
     })
 
-
-    # =====================================================
-    # إزالة المرفق بعد الإرسال
-    # =====================================================
-
-    st.session_state.attached_file = None
-
-    st.session_state.attachment_mode = None
 
     st.rerun()

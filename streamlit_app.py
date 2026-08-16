@@ -61,10 +61,6 @@ if "messages" not in st.session_state:
 if "plan" not in st.session_state:
     st.session_state.plan = "Free"
 
-# المرفق الحالي
-if "attached_file" not in st.session_state:
-    st.session_state.attached_file = None
-
 # =========================================================
 # التصميم
 # =========================================================
@@ -76,7 +72,7 @@ st.markdown(
     .block-container {
         max-width: 900px;
         padding-top: 2rem;
-        padding-bottom: 7rem;
+        padding-bottom: 5rem;
     }
 
     .yosef-title {
@@ -100,11 +96,16 @@ st.markdown(
         border: 1px solid #444;
     }
 
-    .attachment-box {
-        padding: 10px;
+    /* نخلي خانة الكتابة شكلها نظيف */
+
+    [data-testid="stChatInput"] {
+        border-radius: 18px;
+    }
+
+    /* زر المرفقات داخل chat input */
+
+    [data-testid="stChatInput"] button {
         border-radius: 12px;
-        border: 1px solid #444;
-        margin-bottom: 10px;
     }
 
     </style>
@@ -379,7 +380,9 @@ def read_file(file):
                 )
 
                 if page_text:
-                    text.append(page_text)
+                    text.append(
+                        page_text
+                    )
 
             return "\n".join(text)
 
@@ -428,8 +431,6 @@ def create_messages(
         }
     ]
 
-    # ذاكرة آخر 8 رسائل
-
     for message in (
         st.session_state.messages[-8:]
     ):
@@ -450,12 +451,8 @@ def create_messages(
         }
     ]
 
-    # صورة أو ملف
-
     if extra_content:
         content.extend(extra_content)
-
-    # البحث
 
     if should_search(user_text):
 
@@ -490,8 +487,6 @@ def ask_ai(
     user_text,
     extra_content=None
 ):
-
-    # إجابة المطور مباشرة
 
     if developer_question(user_text):
 
@@ -676,7 +671,6 @@ with col1:
     ):
 
         st.session_state.messages = []
-        st.session_state.attached_file = None
 
         st.rerun()
 
@@ -749,119 +743,35 @@ with st.expander(
                 )
 
 # =========================================================
-# زر المرفقات الجديد
+# الإدخال الرئيسي
 # =========================================================
-
-st.markdown(
-    "### 📎 المرفقات"
-)
-
-with st.popover(
-    "➕ إضافة صورة أو ملف",
-    width="stretch"
-):
-
-    st.markdown(
-        "### 📎 اختر نوع المرفق"
-    )
-
-    # الكاميرا
-
-    camera_photo = st.camera_input(
-        "📷 افتح الكاميرا والتقط صورة",
-        key="yosef_camera"
-    )
-
-    # الملفات والصور
-
-    uploaded_file = st.file_uploader(
-        "🖼️ الصور والملفات",
-        type=[
-            "png",
-            "jpg",
-            "jpeg",
-            "webp",
-            "txt",
-            "pdf",
-            "docx",
-        ],
-        accept_multiple_files=False,
-        key="yosef_uploader"
-    )
-
-    # اختيار الصورة من الكاميرا
-
-    selected_file = None
-
-    if camera_photo is not None:
-
-        selected_file = camera_photo
-
-    elif uploaded_file is not None:
-
-        selected_file = uploaded_file
-
-    if selected_file is not None:
-
-        file_bytes = selected_file.getvalue()
-
-        st.session_state.attached_file = {
-            "name": selected_file.name,
-            "type": selected_file.type or "",
-            "data": file_bytes,
-        }
-
-        st.success(
-            "✅ تم تجهيز المرفق: "
-            + selected_file.name
-        )
-
-# =========================================================
-# عرض المرفق الحالي
-# =========================================================
-
-attached = st.session_state.attached_file
-
-if attached:
-
-    st.markdown(
-        '<div class="attachment-box">',
-        unsafe_allow_html=True
-    )
-
-    st.write(
-        "📎 المرفق الحالي:",
-        attached["name"]
-    )
-
-    if attached["type"].startswith("image/"):
-
-        st.image(
-            attached["data"],
-            use_container_width=True
-        )
-
-    if st.button(
-        "🗑️ إزالة المرفق",
-        key="remove_attachment",
-        use_container_width=True
-    ):
-
-        st.session_state.attached_file = None
-
-        st.rerun()
-
-    st.markdown(
-        "</div>",
-        unsafe_allow_html=True
-    )
-
-# =========================================================
-# الإدخال
+#
+# هنا رجعنا إلى chat_input الأصلي.
+#
+# زر + الموجود داخله هو زر المرفقات الأصلي
+# في Streamlit.
+#
+# يتيح:
+# صور
+# PNG / JPG / JPEG / WEBP
+# PDF
+# DOCX
+# TXT
+#
 # =========================================================
 
 prompt = st.chat_input(
-    "اكتب رسالتك..."
+    "اكتب رسالتك...",
+    accept_file=True,
+    file_type=[
+        "png",
+        "jpg",
+        "jpeg",
+        "webp",
+        "txt",
+        "pdf",
+        "docx",
+    ],
 )
 
 # =========================================================
@@ -870,29 +780,48 @@ prompt = st.chat_input(
 
 if prompt:
 
-    user_text = prompt.strip()
+    user_text = (
+        prompt.text
+        or ""
+    )
+
+    uploaded_file = None
+
+    if prompt.files:
+
+        uploaded_file = (
+            prompt.files[0]
+        )
 
     extra_content = []
-
-    attached = st.session_state.attached_file
 
     # =====================================================
     # معالجة المرفق
     # =====================================================
 
-    if attached:
+    if uploaded_file:
 
-        file_type = attached["type"]
-        file_data = attached["data"]
-        file_name = attached["name"]
+        file_type = (
+            uploaded_file.type
+            or ""
+        )
 
+        # -------------------------------------------------
         # صورة
+        # -------------------------------------------------
 
-        if file_type.startswith("image/"):
+        if file_type.startswith(
+            "image/"
+        ):
+
+            image_data = (
+                uploaded_file
+                .getvalue()
+            )
 
             encoded = (
                 base64.b64encode(
-                    file_data
+                    image_data
                 )
                 .decode("utf-8")
             )
@@ -909,32 +838,14 @@ if prompt:
                 }
             })
 
+        # -------------------------------------------------
         # ملف
+        # -------------------------------------------------
 
         else:
 
-            class MemoryFile:
-
-                def __init__(
-                    self,
-                    name,
-                    data
-                ):
-
-                    self.name = name
-                    self._data = data
-
-                def getvalue(self):
-
-                    return self._data
-
-            temp_file = MemoryFile(
-                file_name,
-                file_data
-            )
-
             file_text = read_file(
-                temp_file
+                uploaded_file
             )
 
             if file_text:
@@ -964,22 +875,25 @@ if prompt:
                 user_text
             )
 
-        if attached:
+        if uploaded_file:
 
-            if attached["type"].startswith(
-                "image/"
+            if (
+                uploaded_file.type
+                and
+                uploaded_file.type.startswith(
+                    "image/"
+                )
             ):
 
                 st.image(
-                    attached["data"],
-                    use_container_width=True
+                    uploaded_file
                 )
 
             else:
 
                 st.caption(
                     "📎 "
-                    + attached["name"]
+                    + uploaded_file.name
                 )
 
     # =====================================================
@@ -1025,11 +939,5 @@ if prompt:
         "content":
             answer
     })
-
-    # =====================================================
-    # إزالة المرفق بعد الإرسال
-    # =====================================================
-
-    st.session_state.attached_file = None
 
     st.rerun()

@@ -47,11 +47,9 @@ PRO_CODE = st.secrets.get(
 # =========================================================
 
 if not OPENROUTER_KEY:
-
     st.error(
         "❌ مفتاح OPENROUTER_API_KEY غير موجود في Secrets."
     )
-
     st.stop()
 
 
@@ -68,6 +66,11 @@ if "plan" not in st.session_state:
 if "attached_file" not in st.session_state:
     st.session_state.attached_file = None
 
+# مهم:
+# يحدد ماذا سيظهر بعد الضغط على +
+if "attachment_mode" not in st.session_state:
+    st.session_state.attachment_mode = None
+
 
 # =========================================================
 # التصميم
@@ -77,20 +80,20 @@ st.markdown(
     """
     <style>
 
-    /* =========================================
+    /* =====================================================
        الصفحة
-       ========================================= */
+       ===================================================== */
 
     .block-container {
         max-width: 900px;
         padding-top: 2rem;
-        padding-bottom: 7rem;
+        padding-bottom: 8rem;
     }
 
 
-    /* =========================================
+    /* =====================================================
        العنوان
-       ========================================= */
+       ===================================================== */
 
     .yosef-title {
         text-align: center;
@@ -106,9 +109,9 @@ st.markdown(
     }
 
 
-    /* =========================================
+    /* =====================================================
        Free / Pro
-       ========================================= */
+       ===================================================== */
 
     .plan {
         padding: 12px;
@@ -119,9 +122,9 @@ st.markdown(
     }
 
 
-    /* =========================================
-       شريط الكتابة الأصلي
-       ========================================= */
+    /* =====================================================
+       خانة الكتابة
+       ===================================================== */
 
     div[data-testid="stChatInput"] {
 
@@ -150,7 +153,7 @@ st.markdown(
 
         border: 1px solid #45454d !important;
 
-        border-radius: 24px !important;
+        border-radius: 26px !important;
 
         min-height: 58px !important;
 
@@ -159,7 +162,7 @@ st.markdown(
     }
 
 
-    /* textarea */
+    /* النص */
 
     div[data-testid="stChatInput"] textarea {
 
@@ -169,14 +172,13 @@ st.markdown(
 
         font-size: 16px !important;
 
-        padding-right: 55px !important;
+        padding-right: 62px !important;
 
         padding-left: 55px !important;
     }
 
 
     div[data-testid="stChatInput"] textarea::placeholder {
-
         color: #888 !important;
     }
 
@@ -184,14 +186,14 @@ st.markdown(
     /* زر الإرسال */
 
     div[data-testid="stChatInput"] button {
-
         border-radius: 50% !important;
     }
 
 
-    /* =========================================
+    /* =====================================================
        زر +
-       ========================================= */
+       موجود بصريًا داخل خانة الكتابة
+       ===================================================== */
 
     div[data-testid="stPopover"] {
 
@@ -199,23 +201,27 @@ st.markdown(
 
         z-index: 1000000 !important;
 
-        bottom: 25px !important;
+        bottom: 26px !important;
 
         right:
             calc(
                 (100% - min(900px, calc(100% - 30px))) / 2
                 + 8px
             ) !important;
+
+        margin: 0 !important;
     }
 
 
     div[data-testid="stPopover"] > button {
 
-        width: 42px !important;
+        width: 44px !important;
 
-        height: 42px !important;
+        height: 44px !important;
 
-        min-height: 42px !important;
+        min-width: 44px !important;
+
+        min-height: 44px !important;
 
         padding: 0 !important;
 
@@ -223,13 +229,13 @@ st.markdown(
 
         background: transparent !important;
 
-        color: #ffffff !important;
+        color: white !important;
 
-        font-size: 30px !important;
+        font-size: 31px !important;
 
         font-weight: 400 !important;
 
-        line-height: 42px !important;
+        line-height: 44px !important;
 
         box-shadow: none !important;
 
@@ -239,21 +245,22 @@ st.markdown(
 
     div[data-testid="stPopover"] > button:hover {
 
-        background: rgba(255,255,255,0.08) !important;
+        background:
+            rgba(255,255,255,0.08) !important;
     }
 
 
-    /* =========================================
-       قائمة المرفقات
-       ========================================= */
+    /* =====================================================
+       قائمة +
+       ===================================================== */
 
     div[data-testid="stPopoverBody"] {
 
-        min-width: 230px !important;
+        min-width: 235px !important;
 
         max-width: 280px !important;
 
-        padding: 14px !important;
+        padding: 12px !important;
 
         border-radius: 18px !important;
 
@@ -262,13 +269,25 @@ st.markdown(
         border: 1px solid #444 !important;
 
         box-shadow:
-            0 10px 35px rgba(0,0,0,0.35) !important;
+            0 10px 35px rgba(0,0,0,0.45) !important;
     }
 
 
-    /* =========================================
-       المرفق الحالي
-       ========================================= */
+    /* أزرار القائمة */
+
+    div[data-testid="stPopoverBody"] button {
+
+        border-radius: 12px !important;
+
+        min-height: 48px !important;
+
+        text-align: right !important;
+    }
+
+
+    /* =====================================================
+       صندوق المرفق
+       ===================================================== */
 
     .attachment-box {
 
@@ -278,24 +297,26 @@ st.markdown(
 
         border-radius: 14px;
 
-        padding: 10px;
+        padding: 12px;
 
-        margin-bottom: 10px;
+        margin-bottom: 12px;
+
     }
 
 
-    /* =========================================
+    /* =====================================================
        الموبايل
-       ========================================= */
+       ===================================================== */
 
     @media (max-width: 600px) {
 
         .block-container {
 
             padding-left: 15px;
+
             padding-right: 15px;
 
-            padding-bottom: 6rem;
+            padding-bottom: 7rem;
         }
 
 
@@ -314,21 +335,29 @@ st.markdown(
         }
 
 
+        /*
+           زر + داخل خانة الكتابة
+        */
+
         div[data-testid="stPopover"] {
 
-            right: 24px !important;
+            right: 23px !important;
 
-            bottom: 22px !important;
+            bottom: 21px !important;
         }
 
 
         div[data-testid="stPopover"] > button {
 
-            width: 42px !important;
+            width: 44px !important;
 
-            height: 42px !important;
+            height: 44px !important;
 
-            font-size: 29px !important;
+            min-width: 44px !important;
+
+            min-height: 44px !important;
+
+            font-size: 30px !important;
         }
 
     }
@@ -588,6 +617,7 @@ def read_file_bytes(
 
         name = file_name.lower()
 
+        # TXT
         if name.endswith(".txt"):
 
             return data.decode(
@@ -595,6 +625,7 @@ def read_file_bytes(
                 errors="ignore"
             )
 
+        # PDF
         if name.endswith(".pdf"):
 
             from pypdf import PdfReader
@@ -619,6 +650,7 @@ def read_file_bytes(
 
             return "\n".join(text)
 
+        # DOCX
         if name.endswith(".docx"):
 
             from docx import Document
@@ -699,7 +731,9 @@ def create_messages(
         if result:
 
             content.append({
+
                 "type": "text",
+
                 "text": (
                     "هذه معلومات من البحث "
                     "على الإنترنت، استخدمها "
@@ -709,8 +743,11 @@ def create_messages(
             })
 
     messages.append({
+
         "role": "user",
+
         "content": content
+
     })
 
     return messages
@@ -739,6 +776,7 @@ def ask_ai(
     )
 
     headers = {
+
         "Authorization":
             f"Bearer {OPENROUTER_KEY}",
 
@@ -753,6 +791,7 @@ def ask_ai(
     }
 
     payload = {
+
         "model":
             MODEL,
 
@@ -769,9 +808,13 @@ def ask_ai(
     try:
 
         response = requests.post(
+
             OPENROUTER_URL,
+
             headers=headers,
+
             json=payload,
+
             timeout=90,
         )
 
@@ -841,11 +884,14 @@ def ask_ai(
         ):
 
             answer = "".join(
+
                 item.get(
                     "text",
                     ""
                 )
+
                 for item in answer
+
                 if isinstance(
                     item,
                     dict
@@ -895,7 +941,9 @@ for message in (
     role = message["role"]
 
     with st.chat_message(
+
         role,
+
         avatar=(
             "👤"
             if role == "user"
@@ -924,6 +972,8 @@ with col1:
         st.session_state.messages = []
 
         st.session_state.attached_file = None
+
+        st.session_state.attachment_mode = None
 
         st.rerun()
 
@@ -961,8 +1011,11 @@ with st.expander(
     if PRO_PAYMENT_URL:
 
         st.link_button(
+
             "💳 اشترك في Pro",
+
             PRO_PAYMENT_URL,
+
             use_container_width=True
         )
 
@@ -975,7 +1028,9 @@ with st.expander(
     if PRO_CODE:
 
         code = st.text_input(
+
             "كود Pro",
+
             type="password"
         )
 
@@ -1002,7 +1057,7 @@ with st.expander(
 
 
 # =========================================================
-# زر + للمرفقات
+# زر + داخل منطقة الكتابة
 # =========================================================
 
 with st.popover("＋"):
@@ -1011,29 +1066,128 @@ with st.popover("＋"):
         "### 📎 إضافة إلى Yosef AI"
     )
 
-    # -------------------------------
-    # صورة
-    # -------------------------------
+    st.caption(
+        "اختار نوع المرفق:"
+    )
+
+    # =====================================================
+    # الكاميرا
+    # =====================================================
+
+    if st.button(
+        "📷  كاميرا",
+        use_container_width=True,
+        key="choose_camera"
+    ):
+
+        st.session_state.attachment_mode = "camera"
+
+        st.rerun()
+
+
+    # =====================================================
+    # الصور
+    # =====================================================
+
+    if st.button(
+        "🖼️  الصور",
+        use_container_width=True,
+        key="choose_image"
+    ):
+
+        st.session_state.attachment_mode = "image"
+
+        st.rerun()
+
+
+    # =====================================================
+    # الملفات
+    # =====================================================
+
+    if st.button(
+        "📎  ملفات",
+        use_container_width=True,
+        key="choose_file"
+    ):
+
+        st.session_state.attachment_mode = "file"
+
+        st.rerun()
+
+
+# =========================================================
+# اختيار الكاميرا
+# =========================================================
+
+if st.session_state.attachment_mode == "camera":
 
     st.markdown(
-        "🖼️ **صورة**"
+        "### 📷 التقاط صورة"
+    )
+
+    camera_file = st.camera_input(
+        "التقط صورة",
+        key="yosef_camera"
+    )
+
+    if camera_file is not None:
+
+        st.session_state.attached_file = {
+
+            "name":
+                "camera_photo.jpg",
+
+            "type":
+                "image/jpeg",
+
+            "data":
+                camera_file.getvalue(),
+        }
+
+        st.session_state.attachment_mode = None
+
+        st.rerun()
+
+    if st.button(
+        "✖️ إلغاء",
+        key="cancel_camera"
+    ):
+
+        st.session_state.attachment_mode = None
+
+        st.rerun()
+
+
+# =========================================================
+# اختيار الصور
+# =========================================================
+
+elif st.session_state.attachment_mode == "image":
+
+    st.markdown(
+        "### 🖼️ اختيار صورة"
     )
 
     image_file = st.file_uploader(
+
         "اختر صورة",
+
         type=[
             "png",
             "jpg",
             "jpeg",
             "webp",
         ],
+
         accept_multiple_files=False,
+
         key="yosef_image",
     )
 
     if image_file is not None:
 
         st.session_state.attached_file = {
+
             "name":
                 image_file.name,
 
@@ -1045,56 +1199,49 @@ with st.popover("＋"):
                 image_file.getvalue(),
         }
 
+        st.session_state.attachment_mode = None
 
-    # -------------------------------
-    # كاميرا
-    # -------------------------------
+        st.rerun()
 
-    st.markdown(
-        "📷 **الكاميرا**"
-    )
+    if st.button(
+        "✖️ إلغاء",
+        key="cancel_image"
+    ):
 
-    camera_file = st.camera_input(
-        "التقط صورة",
-        key="yosef_camera",
-    )
+        st.session_state.attachment_mode = None
 
-    if camera_file is not None:
-
-        st.session_state.attached_file = {
-            "name":
-                "camera_photo.jpg",
-
-            "type":
-                "image/jpeg",
-
-            "data":
-                camera_file.getvalue(),
-        }
+        st.rerun()
 
 
-    # -------------------------------
-    # ملف
-    # -------------------------------
+# =========================================================
+# اختيار الملفات
+# =========================================================
+
+elif st.session_state.attachment_mode == "file":
 
     st.markdown(
-        "📄 **ملف**"
+        "### 📎 اختيار ملف"
     )
 
     document_file = st.file_uploader(
+
         "اختر ملف",
+
         type=[
             "pdf",
             "docx",
             "txt",
         ],
+
         accept_multiple_files=False,
+
         key="yosef_document",
     )
 
     if document_file is not None:
 
         st.session_state.attached_file = {
+
             "name":
                 document_file.name,
 
@@ -1104,6 +1251,19 @@ with st.popover("＋"):
             "data":
                 document_file.getvalue(),
         }
+
+        st.session_state.attachment_mode = None
+
+        st.rerun()
+
+    if st.button(
+        "✖️ إلغاء",
+        key="cancel_file"
+    ):
+
+        st.session_state.attachment_mode = None
+
+        st.rerun()
 
 
 # =========================================================
@@ -1194,7 +1354,10 @@ if prompt:
         file_name = attached["name"]
 
 
+        # -------------------------------------------------
         # صورة
+        # -------------------------------------------------
+
         if file_type.startswith(
             "image/"
         ):
@@ -1207,10 +1370,12 @@ if prompt:
             )
 
             extra_content.append({
+
                 "type":
                     "image_url",
 
                 "image_url": {
+
                     "url":
                         (
                             f"data:"
@@ -1222,17 +1387,23 @@ if prompt:
             })
 
 
+        # -------------------------------------------------
         # ملف
+        # -------------------------------------------------
+
         else:
 
             file_text = read_file_bytes(
+
                 file_name,
+
                 file_data
             )
 
             if file_text:
 
                 extra_content.append({
+
                     "type":
                         "text",
 
@@ -1276,7 +1447,7 @@ if prompt:
                 st.caption(
                     "📎 "
                     + file_name
-                )
+            )
 
 
     # =====================================================
@@ -1293,7 +1464,9 @@ if prompt:
         ):
 
             answer = ask_ai(
+
                 user_text,
+
                 extra_content
             )
 
@@ -1307,6 +1480,7 @@ if prompt:
     # =====================================================
 
     st.session_state.messages.append({
+
         "role":
             "user",
 
@@ -1315,6 +1489,7 @@ if prompt:
     })
 
     st.session_state.messages.append({
+
         "role":
             "assistant",
 
@@ -1324,9 +1499,11 @@ if prompt:
 
 
     # =====================================================
-    # إزالة المرفق
+    # إزالة المرفق بعد الإرسال
     # =====================================================
 
     st.session_state.attached_file = None
+
+    st.session_state.attachment_mode = None
 
     st.rerun()

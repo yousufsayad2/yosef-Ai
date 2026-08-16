@@ -3,5 +3,5 @@ requests
 SpeechRecognition
 pypdf
 python-docx
-gTTS
 openai
+gTTS

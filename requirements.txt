@@ -1,5 +1,7 @@
 streamlit>=1.53.0
+openai
 requests
+SpeechRecognition
 pypdf
 python-docx
-SpeechRecognition
+gTTS

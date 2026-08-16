@@ -3,4 +3,3 @@ requests
 SpeechRecognition
 pypdf
 python-docx
-gTTS

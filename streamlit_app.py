@@ -6,7 +6,7 @@ import speech_recognition as sr
 
 
 # =========================================================
-# إعداد الصفحة
+# PAGE
 # =========================================================
 
 st.set_page_config(
@@ -18,7 +18,7 @@ st.set_page_config(
 
 
 # =========================================================
-# الإعدادات
+# SETTINGS
 # =========================================================
 
 OPENROUTER_KEY = st.secrets.get(
@@ -43,10 +43,6 @@ PRO_CODE = st.secrets.get(
 )
 
 
-# =========================================================
-# التحقق من API
-# =========================================================
-
 if not OPENROUTER_KEY:
     st.error(
         "❌ مفتاح OPENROUTER_API_KEY غير موجود في Secrets."
@@ -55,7 +51,7 @@ if not OPENROUTER_KEY:
 
 
 # =========================================================
-# Session State
+# SESSION STATE
 # =========================================================
 
 if "messages" not in st.session_state:
@@ -67,32 +63,32 @@ if "plan" not in st.session_state:
 if "attached_files" not in st.session_state:
     st.session_state.attached_files = []
 
-if "selected_attachment" not in st.session_state:
-    st.session_state.selected_attachment = None
+if "last_audio_id" not in st.session_state:
+    st.session_state.last_audio_id = None
 
 
 # =========================================================
-# التصميم
+# CSS
 # =========================================================
 
 st.markdown(
     """
     <style>
 
-    /* =====================================================
-       الصفحة
-       ===================================================== */
+    /* =========================
+       MAIN PAGE
+       ========================= */
 
     .block-container {
-        max-width: 900px;
-        padding-top: 2rem;
-        padding-bottom: 8rem;
+        max-width: 900px !important;
+        padding-top: 2rem !important;
+        padding-bottom: 8rem !important;
     }
 
 
-    /* =====================================================
-       العنوان
-       ===================================================== */
+    /* =========================
+       TITLE
+       ========================= */
 
     .yosef-title {
         text-align: center;
@@ -110,9 +106,9 @@ st.markdown(
     }
 
 
-    /* =====================================================
-       Free / Pro
-       ===================================================== */
+    /* =========================
+       PLAN
+       ========================= */
 
     .plan {
         padding: 16px;
@@ -124,211 +120,195 @@ st.markdown(
     }
 
 
-    /* =====================================================
-       خانة الكتابة
-       ===================================================== */
+    /* =========================
+       CHAT INPUT
+       ========================= */
 
     div[data-testid="stChatInput"] {
         position: fixed !important;
-
         left: 50% !important;
-
         transform: translateX(-50%) !important;
+        bottom: 12px !important;
 
-        bottom: 14px !important;
+        width:
+            min(900px, calc(100% - 24px))
+            !important;
 
-        width: min(
-            900px,
-            calc(100% - 24px)
-        ) !important;
-
-        z-index: 99990 !important;
+        z-index: 999900 !important;
     }
 
-
-    /* جسم خانة الكتابة */
 
     div[data-testid="stChatInput"] > div {
         background: #202027 !important;
-
         border: 1px solid #4a4a52 !important;
-
         border-radius: 28px !important;
-
         min-height: 60px !important;
 
         box-shadow:
-            0 6px 25px rgba(0,0,0,0.35) !important;
+            0 6px 25px
+            rgba(0,0,0,0.35) !important;
     }
 
 
-    /* textarea */
-
     div[data-testid="stChatInput"] textarea {
-        display: block !important;
-
-        visibility: visible !important;
-
-        opacity: 1 !important;
-
         background: transparent !important;
-
         color: white !important;
 
-        caret-color: white !important;
-
         font-size: 17px !important;
-
         line-height: 1.5 !important;
 
         padding-top: 16px !important;
-
         padding-bottom: 12px !important;
 
-        padding-left: 62px !important;
-
-        padding-right: 62px !important;
-
-        min-height: 28px !important;
+        padding-left: 58px !important;
+        padding-right: 60px !important;
     }
 
 
     div[data-testid="stChatInput"] textarea::placeholder {
         color: #888 !important;
-
-        opacity: 1 !important;
     }
 
 
-    /* =====================================================
-       زر +
-       ===================================================== */
+    div[data-testid="stChatInput"] button {
+        border-radius: 50% !important;
+    }
+
+
+    /* =========================
+       PLUS BUTTON
+       مهم:
+       لا نعمل fixed للـpopover نفسه
+       ========================= */
 
     div[data-testid="stPopover"] {
-        position: fixed !important;
-
-        left: max(
-            20px,
-            calc(
-                (100% - min(900px, calc(100% - 24px))) / 2
-                + 10px
-            )
-        ) !important;
-
-        bottom: 20px !important;
-
-        z-index: 100000 !important;
-
-        width: 48px !important;
-
-        height: 48px !important;
+        z-index: 1000000 !important;
     }
 
 
     div[data-testid="stPopover"] > button {
-        width: 48px !important;
+        width: 46px !important;
+        height: 46px !important;
 
-        height: 48px !important;
-
-        min-width: 48px !important;
-
-        min-height: 48px !important;
+        min-width: 46px !important;
+        min-height: 46px !important;
 
         padding: 0 !important;
 
-        border-radius: 50% !important;
+        background: #202027 !important;
 
-        background: transparent !important;
-
-        border: none !important;
+        border: 1px solid #555 !important;
 
         color: white !important;
 
-        font-size: 31px !important;
+        font-size: 30px !important;
 
-        line-height: 48px !important;
+        border-radius: 14px !important;
 
-        box-shadow: none !important;
+        box-shadow:
+            0 4px 15px
+            rgba(0,0,0,0.3) !important;
     }
 
 
     div[data-testid="stPopover"] > button:hover {
-        background: rgba(255,255,255,0.08) !important;
+        background: #292930 !important;
     }
 
 
-    /* =====================================================
-       قائمة +
-       ===================================================== */
+    /* =========================
+       POPOVER
+       ========================= */
 
     div[data-testid="stPopoverBody"] {
-        min-width: 280px !important;
+        background: #202027 !important;
 
-        max-width: 330px !important;
-
-        padding: 16px !important;
+        border: 1px solid #4a4a52 !important;
 
         border-radius: 20px !important;
 
-        background: #202027 !important;
+        padding: 16px !important;
 
-        border: 1px solid #444 !important;
+        min-width: 300px !important;
+
+        max-width: 360px !important;
 
         box-shadow:
-            0 10px 35px rgba(0,0,0,0.5) !important;
+            0 10px 40px
+            rgba(0,0,0,0.55) !important;
     }
 
 
-    div[data-testid="stPopoverBody"] .stFileUploader {
-        margin-bottom: 12px !important;
-    }
-
-
-    /* =====================================================
-       عناوين الإضافة
-       ===================================================== */
+    /* =========================
+       UPLOAD TITLES
+       ========================= */
 
     .upload-title {
-        color: white;
-
-        font-size: 18px;
-
+        font-size: 19px;
         font-weight: 700;
 
-        margin-top: 10px;
-
+        margin-top: 12px;
         margin-bottom: 8px;
     }
 
 
-    /* =====================================================
-       الميكروفون خارج خانة الكتابة
-       ===================================================== */
+    /* =========================
+       FILE UPLOADER
+       ========================= */
+
+    div[data-testid="stFileUploader"] {
+        width: 100% !important;
+    }
+
+
+    div[data-testid="stFileUploader"] section {
+        background: #292934 !important;
+
+        border-radius: 15px !important;
+
+        border: 1px solid #383844 !important;
+    }
+
+
+    div[data-testid="stFileUploader"] button {
+        cursor: pointer !important;
+    }
+
+
+    /* =========================
+       CAMERA
+       ========================= */
+
+    div[data-testid="stCameraInput"] {
+        width: 100% !important;
+    }
+
+
+    /* =========================
+       AUDIO INPUT
+       خارج خانة الكتابة
+       ========================= */
 
     div[data-testid="stAudioInput"] {
         position: fixed !important;
 
-        right: max(
-            65px,
-            calc(
-                (100% - min(900px, calc(100% - 24px))) / 2
-                + 65px
-            )
-        ) !important;
+        z-index: 1000002 !important;
 
-        bottom: 21px !important;
+        bottom: 19px !important;
 
-        width: 45px !important;
+        right:
+            max(
+                62px,
+                calc(
+                    (100% - min(900px, calc(100% - 24px))) / 2
+                    + 62px
+                )
+            ) !important;
 
-        height: 45px !important;
-
-        min-width: 45px !important;
-
-        z-index: 100001 !important;
+        width: 48px !important;
+        height: 48px !important;
 
         background: transparent !important;
-
-        overflow: hidden !important;
     }
 
 
@@ -339,70 +319,47 @@ st.markdown(
 
     div[data-testid="stAudioInput"] > div {
         padding: 0 !important;
-
         margin: 0 !important;
 
-        border: none !important;
-
         background: transparent !important;
+
+        border: none !important;
     }
 
 
     div[data-testid="stAudioInput"] button {
-        width: 45px !important;
+        width: 48px !important;
+        height: 48px !important;
 
-        height: 45px !important;
-
-        min-width: 45px !important;
-
-        min-height: 45px !important;
-
-        padding: 0 !important;
+        min-width: 48px !important;
+        min-height: 48px !important;
 
         border-radius: 50% !important;
+
+        padding: 0 !important;
     }
 
 
-    /* =====================================================
-       المرفقات
-       ===================================================== */
-
-    .attachment-box {
-        background: #202027;
-
-        border: 1px solid #444;
-
-        border-radius: 15px;
-
-        padding: 12px;
-
-        margin-bottom: 12px;
-    }
-
-
-    /* =====================================================
-       الصور داخل المحادثة
-       ===================================================== */
+    /* =========================
+       CHAT IMAGES
+       ========================= */
 
     div[data-testid="stChatMessage"] img {
         border-radius: 16px !important;
-
         max-width: 100% !important;
     }
 
 
-    /* =====================================================
-       الموبايل
-       ===================================================== */
+    /* =========================
+       MOBILE
+       ========================= */
 
     @media (max-width: 600px) {
 
         .block-container {
-            padding-left: 12px;
-
-            padding-right: 12px;
-
-            padding-bottom: 7rem;
+            padding-left: 12px !important;
+            padding-right: 12px !important;
+            padding-bottom: 8rem !important;
         }
 
 
@@ -418,58 +375,49 @@ st.markdown(
 
         div[data-testid="stChatInput"] {
             width:
-                calc(100% - 18px) !important;
+                calc(100% - 18px)
+                !important;
 
-            bottom:
-                10px !important;
+            bottom: 10px !important;
         }
 
 
         div[data-testid="stChatInput"] > div {
-            min-height:
-                58px !important;
-
-            border-radius:
-                27px !important;
+            min-height: 58px !important;
+            border-radius: 27px !important;
         }
 
 
         div[data-testid="stChatInput"] textarea {
-            font-size:
-                16px !important;
+            font-size: 16px !important;
 
-            padding-left:
-                58px !important;
-
-            padding-right:
-                58px !important;
+            padding-left: 55px !important;
+            padding-right: 55px !important;
         }
 
 
-        div[data-testid="stPopover"] {
-            left:
-                12px !important;
+        /*
+        مهم:
+        لا نثبت الـPopover نفسه.
+        نخلي Streamlit يتحكم فيه طبيعيًا.
+        */
 
-            bottom:
-                14px !important;
+
+        div[data-testid="stPopover"] > button {
+            width: 46px !important;
+            height: 46px !important;
         }
 
 
         div[data-testid="stAudioInput"] {
-            right:
-                58px !important;
-
-            bottom:
-                17px !important;
+            right: 58px !important;
+            bottom: 16px !important;
         }
 
 
         div[data-testid="stPopoverBody"] {
-            min-width:
-                280px !important;
-
-            max-width:
-                calc(100vw - 24px) !important;
+            min-width: 280px !important;
+            max-width: calc(100vw - 30px) !important;
         }
 
     }
@@ -481,7 +429,7 @@ st.markdown(
 
 
 # =========================================================
-# العنوان
+# HEADER
 # =========================================================
 
 st.markdown(
@@ -498,7 +446,7 @@ st.markdown(
 
 
 # =========================================================
-# الخطة
+# PLAN
 # =========================================================
 
 if st.session_state.plan == "Free":
@@ -576,7 +524,7 @@ who is your developer
 
 
 # =========================================================
-# سؤال المطور
+# DEVELOPER QUESTION
 # =========================================================
 
 def developer_question(text):
@@ -595,6 +543,7 @@ def developer_question(text):
         "مين صنعك",
         "مين اللي عاملك",
         "مين طور البرنامج",
+
         "who developed you",
         "who made you",
         "who created you",
@@ -608,7 +557,7 @@ def developer_question(text):
 
 
 # =========================================================
-# البحث
+# SEARCH
 # =========================================================
 
 def should_search(text):
@@ -623,6 +572,7 @@ def should_search(text):
         "دورلي",
         "دور لي",
         "على النت",
+
         "search",
         "google",
         "latest",
@@ -630,6 +580,7 @@ def should_search(text):
         "news",
         "weather",
         "price",
+
         "أخبار",
         "اخبار",
         "الطقس",
@@ -673,8 +624,7 @@ def web_search(query):
             },
             timeout=8,
             headers={
-                "User-Agent":
-                    "YosefAI/1.0"
+                "User-Agent": "YosefAI/1.0"
             },
         )
 
@@ -721,7 +671,7 @@ def web_search(query):
 
 
 # =========================================================
-# قراءة الملفات
+# READ FILES
 # =========================================================
 
 def read_file_bytes(
@@ -739,6 +689,7 @@ def read_file_bytes(
                 "utf-8",
                 errors="ignore"
             )
+
 
         if name.endswith(".pdf"):
 
@@ -758,11 +709,10 @@ def read_file_bytes(
                 )
 
                 if page_text:
-                    text.append(
-                        page_text
-                    )
+                    text.append(page_text)
 
             return "\n".join(text)
+
 
         if name.endswith(".docx"):
 
@@ -794,7 +744,7 @@ def read_file_bytes(
 
 
 # =========================================================
-# تحويل الصوت إلى نص
+# AUDIO
 # =========================================================
 
 def transcribe_audio(audio_file):
@@ -807,17 +757,17 @@ def transcribe_audio(audio_file):
             audio_file.getvalue()
         )
 
-        audio_buffer = io.BytesIO(
+        with io.BytesIO(
             audio_bytes
-        )
+        ) as audio_buffer:
 
-        with sr.AudioFile(
-            audio_buffer
-        ) as source:
+            with sr.AudioFile(
+                audio_buffer
+            ) as source:
 
-            audio = recognizer.record(
-                source
-            )
+                audio = recognizer.record(
+                    source
+                )
 
         text = recognizer.recognize_google(
             audio,
@@ -836,7 +786,7 @@ def transcribe_audio(audio_file):
 
 
 # =========================================================
-# تجهيز الرسائل
+# CREATE MESSAGES
 # =========================================================
 
 def create_messages(
@@ -851,40 +801,39 @@ def create_messages(
         }
     ]
 
+
     for message in (
         st.session_state.messages[-8:]
     ):
 
         messages.append({
-            "role":
-                message["role"],
-
-            "content":
-                message["content"]
+            "role": message["role"],
+            "content": message["content"]
         })
+
 
     content = [
         {
-            "type":
-                "text",
-
-            "text":
-                (
-                    user_text
-                    if user_text
-                    else
-                    "حلل المحتوى المرفق."
-                )
+            "type": "text",
+            "text": (
+                user_text
+                if user_text
+                else
+                "حلل المحتوى المرفق."
+            )
         }
     ]
 
-    if extra_content:
 
+    if extra_content:
         content.extend(
             extra_content
         )
 
-    if should_search(user_text):
+
+    if should_search(
+        user_text
+    ):
 
         result = web_search(
             user_text
@@ -893,31 +842,27 @@ def create_messages(
         if result:
 
             content.append({
-                "type":
-                    "text",
-
-                "text":
-                    (
-                        "هذه معلومات من البحث "
-                        "على الإنترنت، استخدمها "
-                        "كمعلومات مساعدة:\n\n"
-                        + result
-                    )
+                "type": "text",
+                "text": (
+                    "هذه معلومات من البحث "
+                    "على الإنترنت، استخدمها "
+                    "كمعلومات مساعدة:\n\n"
+                    + result
+                )
             })
 
-    messages.append({
-        "role":
-            "user",
 
-        "content":
-            content
+    messages.append({
+        "role": "user",
+        "content": content
     })
+
 
     return messages
 
 
 # =========================================================
-# الذكاء الاصطناعي
+# AI
 # =========================================================
 
 def ask_ai(
@@ -934,10 +879,12 @@ def ask_ai(
             "وتم تطويري بواسطة يوسف."
         )
 
+
     messages = create_messages(
         user_text,
         extra_content
     )
+
 
     headers = {
         "Authorization":
@@ -953,6 +900,7 @@ def ask_ai(
             "Yosef AI",
     }
 
+
     payload = {
         "model":
             MODEL,
@@ -967,6 +915,7 @@ def ask_ai(
             0.3,
     }
 
+
     try:
 
         response = requests.post(
@@ -976,11 +925,13 @@ def ask_ai(
             timeout=90,
         )
 
+
         if response.status_code == 401:
 
             return (
                 "❌ مفتاح OpenRouter غير صحيح."
             )
+
 
         if response.status_code == 429:
 
@@ -989,12 +940,14 @@ def ask_ai(
                 "من OpenRouter. حاول مرة أخرى."
             )
 
+
         if response.status_code >= 500:
 
             return (
                 "⏳ خادم الذكاء مشغول حاليًا. "
                 "حاول مرة أخرى."
             )
+
 
         if response.status_code != 200:
 
@@ -1017,6 +970,7 @@ def ask_ai(
                 + str(error)
             )
 
+
         data = response.json()
 
         choices = data.get(
@@ -1024,17 +978,20 @@ def ask_ai(
             []
         )
 
+
         if not choices:
 
             return (
                 "❌ لم يصل رد من النموذج."
             )
 
+
         answer = (
             choices[0]
             .get("message", {})
             .get("content", "")
         )
+
 
         if isinstance(
             answer,
@@ -1053,15 +1010,18 @@ def ask_ai(
                 )
             )
 
+
         if not answer:
 
             return (
                 "❌ النموذج لم يُرجع نصًا."
             )
 
+
         return str(
             answer
         ).strip()
+
 
     except requests.exceptions.Timeout:
 
@@ -1070,12 +1030,14 @@ def ask_ai(
             "حاول مرة أخرى."
         )
 
+
     except requests.exceptions.ConnectionError:
 
         return (
             "❌ لا يمكن الاتصال بالخادم. "
             "تأكد من الإنترنت."
         )
+
 
     except Exception as error:
 
@@ -1086,10 +1048,12 @@ def ask_ai(
 
 
 # =========================================================
-# عرض المحادثة
+# OLD MESSAGES
 # =========================================================
 
-for message in st.session_state.messages:
+for message in (
+    st.session_state.messages
+):
 
     role = message["role"]
 
@@ -1108,10 +1072,11 @@ for message in st.session_state.messages:
 
 
 # =========================================================
-# الأزرار
+# NEW CHAT
 # =========================================================
 
 col1, col2 = st.columns(2)
+
 
 with col1:
 
@@ -1123,8 +1088,6 @@ with col1:
         st.session_state.messages = []
 
         st.session_state.attached_files = []
-
-        st.session_state.selected_attachment = None
 
         st.rerun()
 
@@ -1145,7 +1108,7 @@ with col2:
 
 
 # =========================================================
-# Pro
+# PRO
 # =========================================================
 
 with st.expander(
@@ -1155,6 +1118,7 @@ with st.expander(
     st.write(
         "احصل على استخدام أكبر ومميزات إضافية."
     )
+
 
     if PRO_PAYMENT_URL:
 
@@ -1170,12 +1134,14 @@ with st.expander(
             "رابط الدفع غير مضاف حاليًا."
         )
 
+
     if PRO_CODE:
 
         code = st.text_input(
             "كود Pro",
             type="password"
         )
+
 
         if st.button(
             "تفعيل Pro",
@@ -1200,17 +1166,22 @@ with st.expander(
 
 
 # =========================================================
-# زر + للمرفقات
+# PLUS MENU
 # =========================================================
 
-with st.popover("＋"):
+with st.popover(
+    "＋",
+    type="secondary",
+    width="content"
+):
 
     st.markdown(
         "## 📎 إضافة إلى Yosef AI"
     )
 
+
     # =====================================================
-    # الكاميرا
+    # CAMERA
     # =====================================================
 
     st.markdown(
@@ -1218,11 +1189,13 @@ with st.popover("＋"):
         unsafe_allow_html=True
     )
 
+
     camera_file = st.camera_input(
         "التقط صورة",
         key="yosef_camera",
         label_visibility="visible"
     )
+
 
     if camera_file is not None:
 
@@ -1245,13 +1218,14 @@ with st.popover("＋"):
 
 
     # =====================================================
-    # الصور
+    # IMAGES
     # =====================================================
 
     st.markdown(
         '<div class="upload-title">🖼️ الصور</div>',
         unsafe_allow_html=True
     )
+
 
     image_file = st.file_uploader(
         "اختر صورة من الهاتف",
@@ -1262,9 +1236,10 @@ with st.popover("＋"):
             "webp",
         ],
         accept_multiple_files=False,
-        key="yosef_image",
-        label_visibility="visible"
+        key="yosef_image_uploader",
+        label_visibility="visible",
     )
+
 
     if image_file is not None:
 
@@ -1288,13 +1263,14 @@ with st.popover("＋"):
 
 
     # =====================================================
-    # الملفات
+    # DOCUMENTS
     # =====================================================
 
     st.markdown(
         '<div class="upload-title">📎 الملفات</div>',
         unsafe_allow_html=True
     )
+
 
     document_files = st.file_uploader(
         "اختر ملفات",
@@ -1304,44 +1280,50 @@ with st.popover("＋"):
             "txt",
         ],
         accept_multiple_files=True,
-        key="yosef_document",
-        label_visibility="visible"
+        key="yosef_document_uploader",
+        label_visibility="visible",
     )
+
 
     if document_files:
 
-        # لا نمسح صورة تم اختيارها بالخطأ
-        current = []
+        image_is_selected = (
+            image_file is not None
+        )
 
-        for uploaded in document_files:
+        if not image_is_selected:
 
-            current.append({
-                "name":
-                    uploaded.name,
+            st.session_state.attached_files = []
 
-                "type":
-                    uploaded.type or "",
+            for uploaded in document_files:
 
-                "data":
-                    uploaded.getvalue(),
-            })
+                st.session_state.attached_files.append({
+                    "name":
+                        uploaded.name,
 
-        st.session_state.attached_files = current
+                    "type":
+                        uploaded.type or "",
+
+                    "data":
+                        uploaded.getvalue(),
+                })
+
 
         st.success(
-            f"✅ تم اختيار {len(current)} ملف"
+            f"✅ تم اختيار {len(document_files)} ملف"
         )
 
 
 # =========================================================
-# عرض المرفقات الحالية
+# SHOW ATTACHMENTS
 # =========================================================
 
 if st.session_state.attached_files:
 
     st.markdown(
-        "### 📎 المرفقات الحالية"
+        "### 📎 المرفق الحالي"
     )
+
 
     for attached in (
         st.session_state.attached_files
@@ -1353,10 +1335,6 @@ if st.session_state.attached_files:
 
         file_data = attached["data"]
 
-        st.markdown(
-            '<div class="attachment-box">',
-            unsafe_allow_html=True
-        )
 
         if file_type.startswith(
             "image/"
@@ -1367,20 +1345,15 @@ if st.session_state.attached_files:
                 width=220
             )
 
-        st.write(
-            "📎",
-            file_name
+
+        st.caption(
+            "📎 " + file_name
         )
 
-        st.markdown(
-            "</div>",
-            unsafe_allow_html=True
-        )
 
     if st.button(
         "🗑️ إزالة المرفقات",
-        key="remove_all_attachments",
-        use_container_width=True
+        key="remove_all_attachments"
     ):
 
         st.session_state.attached_files = []
@@ -1389,7 +1362,8 @@ if st.session_state.attached_files:
 
 
 # =========================================================
-# الميكروفون — خارج خانة الكتابة
+# MICROPHONE
+# خارج خانة الكتابة
 # =========================================================
 
 audio_file = st.audio_input(
@@ -1400,7 +1374,7 @@ audio_file = st.audio_input(
 
 
 # =========================================================
-# خانة الكتابة الرئيسية
+# TEXT INPUT
 # =========================================================
 
 prompt = st.chat_input(
@@ -1410,90 +1384,106 @@ prompt = st.chat_input(
 
 
 # =========================================================
-# تنفيذ الصوت
+# AUDIO PROCESSING
 # =========================================================
 
 if audio_file is not None:
 
-    with st.spinner(
-        "🎤 جاري تحويل الصوت إلى نص..."
+    audio_id = id(audio_file)
+
+    if (
+        st.session_state.last_audio_id
+        != audio_id
     ):
 
-        voice_text = transcribe_audio(
-            audio_file
-        )
+        st.session_state.last_audio_id = audio_id
 
-    if voice_text:
-
-        with st.chat_message(
-            "user",
-            avatar="👤"
+        with st.spinner(
+            "🎤 جاري تحويل الصوت إلى نص..."
         ):
 
-            st.markdown(
-                "🎤 " + voice_text
+            voice_text = transcribe_audio(
+                audio_file
             )
 
-        with st.chat_message(
-            "assistant",
-            avatar="🤖"
-        ):
 
-            with st.spinner(
-                "🤖 Yosef AI بيكتب..."
+        if voice_text:
+
+            st.session_state.messages.append({
+                "role":
+                    "user",
+
+                "content":
+                    "🎤 " + voice_text,
+            })
+
+
+            with st.chat_message(
+                "user",
+                avatar="👤"
             ):
 
-                answer = ask_ai(
-                    voice_text
+                st.markdown(
+                    "🎤 " + voice_text
                 )
 
-            st.markdown(
-                answer
-            )
 
-        st.session_state.messages.append({
-            "role":
-                "user",
-
-            "content":
-                "🎤 " + voice_text
-        })
-
-        st.session_state.messages.append({
-            "role":
+            with st.chat_message(
                 "assistant",
+                avatar="🤖"
+            ):
 
-            "content":
-                answer
-        })
+                with st.spinner(
+                    "🤖 Yosef AI بيكتب..."
+                ):
 
-        st.rerun()
+                    answer = ask_ai(
+                        voice_text
+                    )
 
-    else:
 
-        st.warning(
-            "⚠️ لم أستطع فهم التسجيل الصوتي. "
-            "حاول مرة أخرى بوضوح."
-        )
+                st.markdown(
+                    answer
+                )
+
+
+            st.session_state.messages.append({
+                "role":
+                    "assistant",
+
+                "content":
+                    answer,
+            })
+
+
+            st.rerun()
+
+
+        else:
+
+            st.warning(
+                "⚠️ لم أستطع فهم التسجيل الصوتي."
+            )
 
 
 # =========================================================
-# تنفيذ الرسالة النصية + المرفقات
+# TEXT + ATTACHMENTS
 # =========================================================
 
 if prompt:
 
     user_text = prompt.strip()
 
-    extra_content = []
-
-    attached_files = list(
+    attached_files = (
         st.session_state.attached_files
     )
 
 
+    extra_content = []
+
+
     # =====================================================
-    # معالجة المرفقات
+    # ATTACHMENTS -> AI
     # =====================================================
 
     for attached in attached_files:
@@ -1505,10 +1495,7 @@ if prompt:
         file_data = attached["data"]
 
 
-        # -------------------------------------------------
-        # صورة
-        # -------------------------------------------------
-
+        # IMAGE
         if file_type.startswith(
             "image/"
         ):
@@ -1519,6 +1506,7 @@ if prompt:
                 )
                 .decode("utf-8")
             )
+
 
             extra_content.append({
                 "type":
@@ -1536,16 +1524,14 @@ if prompt:
             })
 
 
-        # -------------------------------------------------
-        # ملف
-        # -------------------------------------------------
-
+        # DOCUMENT
         else:
 
             file_text = read_file_bytes(
                 file_name,
                 file_data
             )
+
 
             if file_text:
 
@@ -1563,7 +1549,7 @@ if prompt:
 
 
     # =====================================================
-    # رسالة المستخدم
+    # USER MESSAGE
     # =====================================================
 
     with st.chat_message(
@@ -1577,6 +1563,7 @@ if prompt:
                 user_text
             )
 
+
         for attached in attached_files:
 
             file_type = attached["type"]
@@ -1584,6 +1571,7 @@ if prompt:
             file_data = attached["data"]
 
             file_name = attached["name"]
+
 
             if file_type.startswith(
                 "image/"
@@ -1602,7 +1590,7 @@ if prompt:
 
 
     # =====================================================
-    # رد Yosef AI
+    # AI ANSWER
     # =====================================================
 
     with st.chat_message(
@@ -1619,30 +1607,32 @@ if prompt:
                 extra_content
             )
 
+
         st.markdown(
             answer
         )
 
 
     # =====================================================
-    # حفظ المحادثة
+    # SAVE
     # =====================================================
 
-    if user_text:
+    saved_user_text = user_text
 
-        saved_user_text = user_text
 
-    elif attached_files:
+    if not saved_user_text:
 
-        saved_user_text = (
-            "📎 تم إرسال مرفق"
-        )
+        if attached_files:
 
-    else:
+            saved_user_text = (
+                "📎 تم إرسال مرفق"
+            )
 
-        saved_user_text = (
-            "رسالة بدون نص"
-        )
+        else:
+
+            saved_user_text = (
+                "رسالة بدون نص"
+            )
 
 
     st.session_state.messages.append({
@@ -1650,20 +1640,21 @@ if prompt:
             "user",
 
         "content":
-            saved_user_text
+            saved_user_text,
     })
+
 
     st.session_state.messages.append({
         "role":
             "assistant",
 
         "content":
-            answer
+            answer,
     })
 
 
     # =====================================================
-    # تنظيف
+    # CLEAR ATTACHMENTS
     # =====================================================
 
     st.session_state.attached_files = []
